@@ -4,7 +4,15 @@
 #ifndef __NES_H__
 #define __NES_H__
 
+#include <cstdlib>
+#include <cstdio>
+#include <iostream>
+#include <fstream>
+#include <exception>
+#include <stdexcept>
+#include <vector>
 #include <stdint.h>
+#include <getopt.h>
 
 class Emulator;
 
@@ -12,6 +20,7 @@ class Emulator;
 #include "mem.h"
 #include "apu.h"
 #include "ppu.h"
+#include "ines.h"
 
 /**
  * NES Emulator
@@ -19,22 +28,52 @@ class Emulator;
 class Emulator
 {
 public:
-  /// Initialises the emulator
+  /**
+   * Initialises the emulator
+   */
   Emulator()
     : cpu(this)
     , memory(this)
     , ppu(this)
     , apu(this)
+    , debug(0)
+    , verbose(0)
   {
   }
 
-  /// Cleanup code
+  /**
+   * Destroys the emulator
+   */
   ~Emulator()
   {
+    Destroy();
   }
 
-  /// Runs the emulator
+  /**
+   * Starts the emulator
+   */
+  void Main(int argc, char **argv);
+
+private:
+  /**
+   * Initialises SDL & start emulation
+   */
+  void Init(const std::string& file);
+
+  /**
+   * Main emulation loop
+   */
   void Run();
+
+  /**
+   * Destroys SDL & cleans up
+   */
+  void Destroy();
+
+  /**
+   * Prints some help
+   */
+  void Usage(std::ostream& os);
 
 private:
   /// Central Processing Unit
@@ -45,6 +84,10 @@ private:
   PPU    ppu;
   /// Audio Processing Unit
   APU    apu;
+  /// Debug flag
+  int    debug;
+  /// Verbose flag
+  int    verbose;
 
   // Allow access between submodules
   friend class CPU;

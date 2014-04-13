@@ -1,13 +1,18 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 PROJECT(nesdr)
 
-SET(SOURCES main.cc
+SET(SOURCES apu.cc
+            cpu.cc
             emu.cc
+            ines.cc
+            mem.cc
+            ppu.cc
    )
 
 SET(HEADERS apu.h
             cpu.h
             emu.h
+            ines.h
             mem.h
             ppu.h
    )

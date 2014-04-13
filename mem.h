@@ -7,86 +7,111 @@
 /**
  * Memory management unit
  *
- * Memory layout:
- * +-----------------+--------+-----------------------------+
- * + 0x0000 - 0x07FF | 0x0800 | Game RAM                    |
- * +-----------------+--------+-----------------------------+
- * + 0x0800 - 0x17FF | 0x0800 | Mirrors of Game RAM         |
- * +-----------------+--------+-----------------------------+
- * + 0x2000 - 0x2007 | 0x0008 | IO Registers                |
- * +-----------------+--------+-----------------------------+
- * + 0x2008 - 0x3FFF | 0x1FF8 | Mirrors of IO Registers     |
- * +-----------------+--------+-----------------------------+
- * + 0x4000 - 0x401F | 0x0020 | IO Registers                |
- * +-----------------+--------+-----------------------------+
- * + 0x4020 - 0x5FFF | 0x0800 | Cartridge Expansion RAM     |
- * +-----------------+--------+-----------------------------+
- * + 0x6000 - 0x7FFF | 0x0800 | SRAM                        |
- * +-----------------+--------+-----------------------------+
- * + 0x8000 - 0xBFFF | 0x0800 | Lower ROM bank              |
- * +-----------------+--------+-----------------------------+
- * + 0xC000 - 0xFFF9 | 0x0800 | Higher ROM bank             |
- * +-----------------+--------+-----------------------------+
- * + 0xFFFA - 0xFFFB | 0x0002 | NMI Handler                 |
- * +-----------------+--------+-----------------------------+
- * + 0xFFFC - 0xFFFD | 0x0002 | Reset Handler               |
- * +-----------------+--------+-----------------------------+
- * + 0xFFFE - 0xFFFF | 0x0002 | BRK Handler                 |
- * +-----------------+--------+-----------------------------+
- *
- * http://www.fceux.com/web/help/fceux.html?NESRAMMappingFindingValues.html
+ * Even though the original NES had only 2kb of RAM, the memory module
+ * uses the whole 64Kb address space in order to minimise the number
+ * of instructions required to access a particular byte.
  */
 class Memory
 {
 public:
+  /**
+   * Initialises the memory subsystem
+   */
   Memory(Emulator *emu)
   {
   }
 
-  uint8_t  ReadByte(uint16_t addr);
-  uint16_t ReadWord(uint16_t addr);
+  /**
+   * Reads a byte from memory
+   * @param addr 16 bit address
+   */
+  uint8_t ReadByte(uint16_t addr);
 
+  /**
+   * Writes a single byte to memory
+   */
   void WriteByte(uint16_t addr, uint8_t byte);
-  void WriteWord(uint16_t addr, uint16_t word);
 
 private:
-  /// Game RAM
-  uint8_t ram[0x800];
 
-  /// Expansion ROM
-  uint8_t erom[0x1FE0];
-
-  /// High memory (0x6000 - )
+  /**
+   * +-----------------+--------+-----------------------------+
+   * + 0x0000 - 0x07FF | 0x0800 | Game RAM                    |
+   * +-----------------+--------+-----------------------------+
+   * + 0x0800 - 0x1FFF | 0x0800 | Mirrors of Game RAM         |
+   * +-----------------+--------+-----------------------------+
+   * + 0x2000 - 0x2007 | 0x0008 | IO Registers                |
+   * +-----------------+--------+-----------------------------+
+   * + 0x2008 - 0x3FFF | 0x1FF8 | Mirrors of IO Registers     |
+   * +-----------------+--------+-----------------------------+
+   * + 0x4000 - 0x401F | 0x0020 | IO Registers                |
+   * +-----------------+--------+-----------------------------+
+   * + 0x4020 - 0x5FFF | 0x0800 | Cartridge Expansion RAM     |
+   * +-----------------+--------+-----------------------------+
+   * + 0x6000 - 0x7FFF | 0x0800 | SRAM                        |
+   * +-----------------+--------+-----------------------------+
+   * + 0x8000 - 0xBFFF | 0x0800 | Lower ROM bank              |
+   * +-----------------+--------+-----------------------------+
+   * + 0xC000 - 0xFFF9 | 0x0800 | Higher ROM bank             |
+   * +-----------------+--------+-----------------------------+
+   * + 0xFFFA - 0xFFFB | 0x0002 | NMI Handler                 |
+   * +-----------------+--------+-----------------------------+
+   * + 0xFFFC - 0xFFFD | 0x0002 | Reset Handler               |
+   * +-----------------+--------+-----------------------------+
+   * + 0xFFFE - 0xFFFF | 0x0002 | BRK Handler                 |
+   * +-----------------+--------+-----------------------------+
+   */
   union
   {
+    uint8_t memory[0x10000];
+
     struct
     {
-      /// SRAM
-      uint8_t sram[0x2000];
+      /// Ram & mirrors
+      uint8_t ram[0x2000];
 
-      /// Low ROM bank
-      uint8_t lrom[0x8000];
+      /// PPU Registers
+      uint8_t rppu[0x2000];
 
-      /// High ROM bank
+      /// APU Registers
+      uint8_t rapu[0x0020];
+
+      /// Expansion ROM
+      uint8_t erom[0x1FE0];
+
+      /// High memory (0x6000 - 0xFFFF)
       union
       {
-        uint8_t hrom[0x8000];
+        uint8_t hmem[0xA000];
 
         struct
         {
-          uint8_t  __[0x7FFA];
+          /// SRAM
+          uint8_t sram[0x2000];
 
-          /// Non Maskable Interrupt (NMI)
-          uint16_t nmi_handler;
-          /// Power on reset handler
-          uint16_t rst_handler;
-          /// Address of Break (BRK instruction)
-          uint16_t brk_handler;
+          /// Low ROM bank
+          uint8_t lrom[0x8000];
+
+          /// High ROM bank
+          union
+          {
+            uint8_t hrom[0x8000];
+
+            struct
+            {
+              uint8_t  __[0x7FFA];
+
+              /// Non Maskable Interrupt (NMI)
+              uint16_t nmi_handler;
+              /// Power on reset handler
+              uint16_t rst_handler;
+              /// Address of Break (BRK instruction)
+              uint16_t brk_handler;
+            };
+          };
         };
       };
     };
-
-    uint8_t hmem[0xA000];
   };
 };
 

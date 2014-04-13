@@ -6,35 +6,44 @@
 uint8_t
 Memory::ReadByte(uint16_t addr)
 {
-  if (__builtin_expect((addr & 0xD000) == 0x0000, 1))
+  // First bank of Game RAM - this path is most likely to be
+  // taken as the stack & most runtime variables reside here
+  if (__builtin_expect((addr & 0xF000) == 0x0000, 1))
   {
-    // RAM & mirror images
-    return ram[addr & 0x07FF];
+    return memory[addr];
   }
-  else if ((addr & 0xC000) == 0x0000)
+
+  // Second most likely path as it contains read-only data or
+  // the SRAM which is not modified too often. Testing for
+  // this branch is also cheap
+  if (addr >= 0x4000)
   {
-    // PPU control registers
-    // ppu->Read(addr & 0x0007);
+    return memory[addr];
   }
-  else if ((addr & 0xFFD0) == 0x4020)
+
+  // Written during VBlank periods, when naive emulation
+  // is usually used, so we don't care much about the cost
+  // of this branch. Also, there registers are written
+  // more ofthen than read
+  if ((addr & 0xC000) == 0x0000)
   {
-    // APU registers
-    // apu->Read(addr & 0x001F);
+    return rppu[addr & 0x0007];
   }
-  else if ((addr & 0xD000) == 0x4000)
-  {
-    // Cartridge expansion ROM
-    return erom[addr - 0x4000];
-  }
-  else
-  {
-    // SRAM, low ROM, high ROM
-    return hmem[addr - 0x6000];
-  }
+
+  // Least likely path - mirrored ram that must
+  // be remapped to the first 2Kb of memory
+  return ram[addr & 0x07FF];
 }
 
 void
 Memory::WriteByte(uint16_t addr, uint8_t byte)
 {
+  // First bank, most likely to be accessed
+  if (__builtin_expect((addr & 0xF000) == 0x0000, 1))
+  {
+    memory[addr] = byte;
+    return;
+  }
 
+  throw std::runtime_error("Unimplemented");
 }
