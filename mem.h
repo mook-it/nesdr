@@ -51,11 +51,40 @@ public:
   uint8_t ReadByte(uint16_t addr);
 
   /**
+   * Reads a byte from the first page
+   * @param addr 8 bit address inside the first page
+   */
+  uint8_t ReadByteZeroPage(uint8_t addr)
+  {
+    return ram[addr];
+  }
+
+  /**
    * Reads a 16 bit word from memory, little endian order
+   * @param addr 16 bit address
    */
   uint16_t ReadWord(uint16_t addr)
   {
     return ReadByte(addr) | (ReadByte(addr + 1) << 8);
+  }
+
+  /**
+   * Reads a word from the first page, little endian order
+   * If address is 0xFF, LSB is read from 0xFF, MSB from 0x00
+   */
+  uint16_t ReadWordZeroPage(uint8_t addr)
+  {
+    return ram[addr] | (ram[(addr + 1) & 0xFF] << 8);
+  }
+
+  /**
+   * Writes a byte to the first page
+   * @param addr Zero page address
+   * @param byte Data to be written
+   */
+  void WriteByteZeroPage(uint8_t addr, uint8_t byte)
+  {
+    ram[addr] = byte;
   }
 
   /**
@@ -148,7 +177,7 @@ private:
   std::unique_ptr<INes> cart;
 
   /// Reference to the emulator
-  Emulator& emu;
+  Emulator &emu;
 };
 
 #endif /*__MEMORY_H__*/

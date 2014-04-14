@@ -27,6 +27,20 @@ public:
 
 private:
 
+  /**
+   * Pushes a word onto the stack and decrements the stack pointer
+   * @param word 16 bit value to be placed onto the stack
+   */
+  void PushWord(uint16_t word);
+
+  /**
+   * Pops a word from the stack and increments the stack pointer
+   * @returns 16 bit value popped from the stack
+   */
+  uint16_t PopWord();
+
+private:
+
   void I00_BRK();
   void I01_ORA();
   void I02_KIL();

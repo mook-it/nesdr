@@ -32,7 +32,7 @@ Memory::ReadByte(uint16_t addr)
 {
   // First bank of Game RAM - this path is most likely to be
   // taken as the stack & most runtime variables reside here
-  if (__builtin_expect((addr & 0xF000) == 0x0000, 1))
+  if (__builtin_expect(addr < 0x0800, 1))
   {
     return memory[addr];
   }
@@ -62,12 +62,35 @@ Memory::ReadByte(uint16_t addr)
 void
 Memory::WriteByte(uint16_t addr, uint8_t byte)
 {
-  // First bank, most likely to be accessed
-  if (__builtin_expect((addr & 0xF000) == 0x0000, 1))
+  // First two banks, most likely to be accessed
+  if (__builtin_expect(addr < 0x0800, 1))
   {
     memory[addr] = byte;
     return;
   }
 
+  // Mapper controls
+  if (addr >= 0x8000)
+  {
+    std::cerr << "Mapper: " << std::hex << addr << " " << (int)byte << std::endl;
+    return;
+  }
+
+  // SRAM
+  if (addr >= 0x6000)
+  {
+    std::cerr << "SRAM: " << std::hex << addr << " " << (int)byte << std::endl;
+    return;
+  }
+
+  // Mirrored RAM
+  if (addr < 0x2000)
+  {
+    std::cerr << std::hex << addr << " " << (int)byte << std::endl;
+    memory[addr & 0x07FF] = byte;
+    return;
+  }
+
+  std::cerr << std::hex << addr << " " << (int)byte << std::endl;
   throw std::runtime_error("Unimplemented");
 }
