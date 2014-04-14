@@ -10,9 +10,31 @@
 class CPU
 {
 public:
-  CPU(Emulator *emu)
+  CPU(Emulator &emu)
+    : emu(emu)
   {
   }
+
+  /**
+   * Executes the reset interrupt
+   */
+  void Start();
+
+  /**
+   * Executes a single instruction
+   */
+  void Tick();
+
+private:
+
+  // Instructions
+  void I00_BRK();
+  void I01_ORA();
+
+  // Dispatch table
+  typedef void (CPU::*IFunPtr) ();
+  static IFunPtr IFunTable[0x100];
+
 private:
   // Accumulator
   uint8_t A;
@@ -54,6 +76,9 @@ private:
 
     uint8_t P;
   };
+
+  /// Emulator reference
+  Emulator &emu;
 };
 
 #endif /*__CPU_H__*/

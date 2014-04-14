@@ -6,21 +6,24 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <exception>
 #include <stdexcept>
+#include <memory>
 #include <vector>
+#include <sstream>
 #include <stdint.h>
 #include <getopt.h>
 
 class Emulator;
 
+#include "ines.h"
 #include "cpu.h"
 #include "mem.h"
 #include "apu.h"
 #include "ppu.h"
-#include "ines.h"
 
 /**
  * NES Emulator
@@ -32,10 +35,10 @@ public:
    * Initialises the emulator
    */
   Emulator()
-    : cpu(this)
-    , memory(this)
-    , ppu(this)
-    , apu(this)
+    : cpu(*this)
+    , mem(*this)
+    , ppu(*this)
+    , apu(*this)
     , debug(0)
     , verbose(0)
   {
@@ -77,17 +80,17 @@ private:
 
 private:
   /// Central Processing Unit
-  CPU    cpu;
+  CPU cpu;
   /// Main memory & ROM
-  Memory memory;
+  Memory mem;
   /// Picture Processing Unit
-  PPU    ppu;
+  PPU ppu;
   /// Audio Processing Unit
-  APU    apu;
+  APU apu;
   /// Debug flag
-  int    debug;
+  int debug;
   /// Verbose flag
-  int    verbose;
+  int verbose;
 
   // Allow access between submodules
   friend class CPU;

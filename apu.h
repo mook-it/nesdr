@@ -10,7 +10,7 @@
 class APU
 {
 public:
-  APU(Emulator *emu)
+  APU(Emulator &emu)
   {
   }
 };

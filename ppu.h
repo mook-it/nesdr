@@ -7,7 +7,7 @@
 class PPU
 {
 public:
-  PPU(Emulator *emu)
+  PPU(Emulator &emu)
   {
   }
 };

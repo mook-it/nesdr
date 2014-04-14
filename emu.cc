@@ -6,18 +6,19 @@
 void
 Emulator::Init(const std::string& file)
 {
-  INes cart(file);
-
-  if (verbose)
-  {
-    cart.Dump(std::cout);
-  }
+  mem.LoadINes(file);
+  mem.LoadBank(0, Memory::LROM);
+  mem.LoadBank(1, Memory::HROM);
+  cpu.Start();
 }
 
 void
 Emulator::Run()
 {
-
+  for (int i = 0; i < 10; ++i)
+  {
+    cpu.Tick();
+  }
 }
 
 void

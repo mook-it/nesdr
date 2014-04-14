@@ -90,7 +90,10 @@ INes::Dump(std::ostream& os)
   os << "CHR ROM size: " << (chrROMData.size() >> 10) << "Kb \n";
   os << "Battery:      " << (hasBattery ? "yes" : "no") << "\n";
   os << "Trainer:      " << (hasTrainer ? "yes" : "no") << "\n";
-  os << "Mapper:       " << std::hex << (uint32_t)mapper << "\n";
+  os << std::hex;
+  os << "Mapper:       0x" << (uint32_t)mapper << "\n";
+  os << "Entry:        0x" << *((uint16_t*)&prgROMData[0x7FFC]) << "\n";
+  os << std::dec;
 
   switch (mirror)
   {

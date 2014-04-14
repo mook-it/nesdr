@@ -13,7 +13,7 @@ public:
   /**
    * Creats a new iNES file reader
    */
-  INes(const std::string& name)
+  INes(const std::string &name)
     : name(name)
   {
     Read();
@@ -30,6 +30,14 @@ public:
    * Prints information about the file to a stream
    */
   void Dump(std::ostream& os);
+
+  /**
+   * Retrieves the PRG rom
+   */
+  const std::vector<uint8_t>& GetPRGRom() const
+  {
+    return prgROMData;
+  }
 
 private:
   /**

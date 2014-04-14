@@ -3,6 +3,30 @@
 // (C) 2013 Licker Nandor. All rights reserved.
 #include "emu.h"
 
+void
+Memory::LoadINes(const std::string& nes)
+{
+  cart.reset(new INes(nes));
+  if (emu.verbose)
+  {
+    cart->Dump(std::cout);
+  }
+}
+
+void
+Memory::LoadBank(uint16_t bank, const ROMArea &where)
+{
+  const std::vector<uint8_t>& rom = cart->GetPRGRom();
+  if (bank << 14 > rom.size())
+  {
+    std::stringstream ss;
+    ss << "Bank index #" << bank << " out of range";
+    throw std::runtime_error(ss.str());
+  }
+
+  memcpy((where == LROM) ? lrom : hrom, &rom[bank << 14], 0x4000);
+}
+
 uint8_t
 Memory::ReadByte(uint16_t addr)
 {
