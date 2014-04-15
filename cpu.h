@@ -4,17 +4,11 @@
 #ifndef __CPU_H__
 #define __CPU_H__
 
-#define ROWL(r, I0, I1, I2, I3, I4, I5, I6, I7)\
-  void I##r##0_##I0(); void I##r##1_##I1();\
-  void I##r##2_##I2(); void I##r##3_##I3();\
-  void I##r##4_##I4(); void I##r##5_##I5();\
-  void I##r##6_##I6(); void I##r##7_##I7();
+#define ROWL(r, a, b, c, d, e, f, g, h)\
+  I(r,0,a) I(r,1,b) I(r,2,c) I(r,3,d) I(r,4,e) I(r,5,f) I(r,6,g) I(r,7,h)
 
-#define ROWH(r, I0, I1, I2, I3, I4, I5, I6, I7)\
-  void I##r##8_##I0(); void I##r##9_##I1();\
-  void I##r##A_##I2(); void I##r##B_##I3();\
-  void I##r##C_##I4(); void I##r##D_##I5();\
-  void I##r##E_##I6(); void I##r##F_##I7();
+#define ROWH(r, a, b, c, d, e, f, g, h)\
+  I(r,8,a) I(r,9,b) I(r,A,c) I(r,B,d) I(r,C,e) I(r,D,f) I(r,E,g) I(r,F,h)
 
 /**
  * Interpretative emulation of the Ricoh 2A03 CPU found in the NES
@@ -53,6 +47,7 @@ private:
 
 private:
 
+  #define I(r, c, i) void I##r##c##_##i();
   ROWL(0, BRK, ORA, KIL, SLO, DOP, ORA, ASL, SLO)
   ROWH(0, PHP, ORA, ASL, AAC, TOP, ORA, ASL, SLO)
   ROWL(1, BPL, ORA, KIL, SLO, DOP, ORA, ASL, SLO)
