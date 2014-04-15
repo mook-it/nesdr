@@ -7,6 +7,8 @@ void
 CPU::Start()
 {
   PC = 0xC000;//emu.mem.ReadWord(0xFFFC);
+  S = 0xFD;
+  P = 0x24;
 }
 
 void
@@ -17,7 +19,14 @@ CPU::Tick()
   op = emu.mem.ReadByte(PC++);
   static int i;
 
-  std::cerr << std::dec << i << " " << std::hex << (int)op << std::endl;
+  std::cerr << std::setw(4) << std::dec << i + 1 << " "
+            << std::setw(4) << std::hex << PC - 1 << " "
+            << std::setw(2) << (int)op
+            << std::setw(6) << (int)A << " "
+            << std::setw(2) << (int)X << " "
+            << std::setw(2) << (int)Y << " "
+            << std::setw(2) << (int)(P & 0xEF) << " "
+            << std::setw(2) << (int)S << std::endl;
   ++i;
   (this->*(IFunTable[op])) ();
 }
@@ -25,8 +34,9 @@ CPU::Tick()
 void
 CPU::PushWord(uint16_t word)
 {
-  emu.mem.WriteByte(S--, (word & 0xFF00) >> 8);
-  emu.mem.WriteByte(S--, (word & 0x00FF) >> 0);
+  emu.mem.WriteByte((0x100 | ((S - 0) & 0xFF)), (word & 0xFF00) >> 8);
+  emu.mem.WriteByte((0x100 | ((S - 1) & 0xFF)), (word & 0x00FF) >> 0);
+  S -= 2;
 }
 
 uint16_t
@@ -34,11 +44,42 @@ CPU::PopWord()
 {
   uint16_t word;
 
-  word = emu.mem.ReadWord(S + 1);
+  word = emu.mem.ReadWord(0x100 | ((S + 1) & 0xFF));
   S += 2;
 
   return word;
 }
+
+// -----------------------------------------------------------------------------
+// Flag helpers
+// -----------------------------------------------------------------------------
+#define SETZ(expr) Z = ((expr) != 0) ? 1 : 0;
+#define SETN(expr) N = ((expr) != 0) ? 1 : 0;
+#define SETV(expr) V = ((expr) != 0) ? 1 : 0;
+#define SETC(expr) C = ((expr) != 0) ? 1 : 0;
+
+#define CLEAR(name, flag)\
+void \
+CPU::name()\
+{\
+  flag = 0;\
+}
+
+CLEAR(I18_CLC, C);
+CLEAR(I58_CLI, I);
+CLEAR(IB8_CLV, V);
+CLEAR(ID8_CLD, D);
+
+#define SET(name, flag)\
+void \
+CPU::name()\
+{\
+  flag = 1;\
+}
+
+SET(I38_SEC, C);
+SET(I78_SEI, I);
+SET(IF8_SED, D);
 
 // -----------------------------------------------------------------------------
 // Branch instructions
@@ -72,6 +113,53 @@ CPU::name()\
 STOREZP(I84_STY, Y);
 STOREZP(I85_STA, A);
 STOREZP(I86_STX, X);
+
+// -----------------------------------------------------------------------------
+// Binary operators on immediate values
+// -----------------------------------------------------------------------------
+#define BINARY_IMM(name, op, reg)\
+void \
+CPU::name()\
+{\
+  reg = reg op emu.mem.ReadByte(PC++);\
+  SETZ(reg == 0x00);\
+  SETN(reg & 0x80);\
+}
+
+BINARY_IMM(I09_ORA, |, A);
+BINARY_IMM(I29_AND, &, A);
+BINARY_IMM(I49_EOR, ^, A);
+
+// -----------------------------------------------------------------------------
+// Stack operations
+// -----------------------------------------------------------------------------
+#define PUSH(name, reg)\
+void \
+CPU::name()\
+{\
+  emu.mem.WriteByte(S | 0x100, reg);\
+  S = (S - 1) & 0xFF;\
+}
+
+PUSH(I08_PHP, P | 0x10);
+PUSH(I48_PHA, A);
+
+void
+CPU::I28_PLP()
+{
+  S = (S + 1) & 0xFF;
+  P = (emu.mem.ReadByte(S | 0x100) & 0xEF) | 0x20;
+}
+
+
+void
+CPU::I68_PLA()
+{
+  S = (S + 1) & 0xFF;
+  A = emu.mem.ReadByte(S | 0x100);
+  SETZ(A == 0);
+  SETN(A & 0x80);
+}
 
 // -----------------------------------------------------------------------------
 // Other instructions
@@ -129,20 +217,6 @@ void
 CPU::I07_SLO()
 {
   std::cerr << "I07_SLO" << std::endl;
-  exit(0);
-}
-
-void
-CPU::I08_PHP()
-{
-  std::cerr << "I08_PHP" << std::endl;
-  exit(0);
-}
-
-void
-CPU::I09_ORA()
-{
-  std::cerr << "I09_ORA" << std::endl;
   exit(0);
 }
 
@@ -238,12 +312,6 @@ CPU::I17_SLO()
 }
 
 void
-CPU::I18_CLC()
-{
-  C = 0;
-}
-
-void
 CPU::I19_ORA()
 {
   std::cerr << "I19_ORA" << std::endl;
@@ -323,8 +391,12 @@ CPU::I23_RLA()
 void
 CPU::I24_BIT()
 {
-  std::cerr << "I24_BIT" << std::endl;
-  exit(0);
+  uint8_t M;
+
+  M = emu.mem.ReadByteZeroPage(emu.mem.ReadByte(PC++));
+  SETZ((A & M) == 0);
+  SETV(M & 0x40);
+  SETN(M & 0x80);
 }
 
 void
@@ -345,20 +417,6 @@ void
 CPU::I27_RLA()
 {
   std::cerr << "I27_RLA" << std::endl;
-  exit(0);
-}
-
-void
-CPU::I28_PLP()
-{
-  std::cerr << "I28_PLP" << std::endl;
-  exit(0);
-}
-
-void
-CPU::I29_AND()
-{
-  std::cerr << "I29_AND" << std::endl;
   exit(0);
 }
 
@@ -451,12 +509,6 @@ CPU::I37_RLA()
 {
   std::cerr << "I37_RLA" << std::endl;
   exit(0);
-}
-
-void
-CPU::I38_SEC()
-{
-  C = 1;
 }
 
 void
@@ -565,20 +617,6 @@ CPU::I47_SRE()
 }
 
 void
-CPU::I48_PHA()
-{
-  std::cerr << "I48_PHA" << std::endl;
-  exit(0);
-}
-
-void
-CPU::I49_EOR()
-{
-  std::cerr << "I49_EOR" << std::endl;
-  exit(0);
-}
-
-void
 CPU::I4A_LSR()
 {
   std::cerr << "I4A_LSR" << std::endl;
@@ -669,13 +707,6 @@ CPU::I57_SRE()
 }
 
 void
-CPU::I58_CLI()
-{
-  std::cerr << "I58_CLI" << std::endl;
-  exit(0);
-}
-
-void
 CPU::I59_EOR()
 {
   std::cerr << "I59_EOR" << std::endl;
@@ -727,7 +758,7 @@ CPU::I5F_SRE()
 void
 CPU::I60_RTS()
 {
-  PC = PopWord() - 1;
+  PC = PopWord() + 1;
 }
 
 void
@@ -779,12 +810,6 @@ CPU::I67_RRA()
   exit(0);
 }
 
-void
-CPU::I68_PLA()
-{
-  std::cerr << "I68_PLA" << std::endl;
-  exit(0);
-}
 
 void
 CPU::I69_ADC()
@@ -882,12 +907,6 @@ CPU::I77_RRA()
 {
   std::cerr << "I77_RRA" << std::endl;
   exit(0);
-}
-
-void
-CPU::I78_SEI()
-{
-  I = 1;
 }
 
 void
@@ -1198,8 +1217,8 @@ void
 CPU::IA9_LDA()
 {
   A = emu.mem.ReadByte(PC++);
-  Z = A == 0;
-  N = A & 0x80;
+  SETZ(A == 0);
+  SETN(A & 0x80);
 }
 
 void
@@ -1291,13 +1310,6 @@ void
 CPU::IB7_LAX()
 {
   std::cerr << "IB7_LAX" << std::endl;
-  exit(0);
-}
-
-void
-CPU::IB8_CLV()
-{
-  std::cerr << "IB8_CLV" << std::endl;
   exit(0);
 }
 
@@ -1418,8 +1430,12 @@ CPU::IC8_INY()
 void
 CPU::IC9_CMP()
 {
-  std::cerr << "IC9_CMP" << std::endl;
-  exit(0);
+  uint8_t M;
+
+  M = emu.mem.ReadByte(PC++);
+  SETC(A >= M);
+  SETZ(A == M);
+  SETN((A - M) & 0x80);
 }
 
 void
@@ -1512,12 +1528,6 @@ CPU::ID7_DCP()
 {
   std::cerr << "ID7_DCP" << std::endl;
   exit(0);
-}
-
-void
-CPU::ID8_CLD()
-{
-  D = 0;
 }
 
 void
@@ -1732,13 +1742,6 @@ void
 CPU::IF7_ISC()
 {
   std::cerr << "IF7_ISC" << std::endl;
-  exit(0);
-}
-
-void
-CPU::IF8_SED()
-{
-  std::cerr << "IF8_SED" << std::endl;
   exit(0);
 }
 

@@ -4,6 +4,18 @@
 #ifndef __CPU_H__
 #define __CPU_H__
 
+#define ROWL(r, I0, I1, I2, I3, I4, I5, I6, I7)\
+  void I##r##0_##I0(); void I##r##1_##I1();\
+  void I##r##2_##I2(); void I##r##3_##I3();\
+  void I##r##4_##I4(); void I##r##5_##I5();\
+  void I##r##6_##I6(); void I##r##7_##I7();
+
+#define ROWH(r, I0, I1, I2, I3, I4, I5, I6, I7)\
+  void I##r##8_##I0(); void I##r##9_##I1();\
+  void I##r##A_##I2(); void I##r##B_##I3();\
+  void I##r##C_##I4(); void I##r##D_##I5();\
+  void I##r##E_##I6(); void I##r##F_##I7();
+
 /**
  * Interpretative emulation of the Ricoh 2A03 CPU found in the NES
  */
@@ -41,277 +53,38 @@ private:
 
 private:
 
-  void I00_BRK();
-  void I01_ORA();
-  void I02_KIL();
-  void I03_SLO();
-  void I04_DOP();
-  void I05_ORA();
-  void I06_ASL();
-  void I07_SLO();
-  void I08_PHP();
-  void I09_ORA();
-  void I0A_ASL();
-  void I0B_AAC();
-  void I0C_TOP();
-  void I0D_ORA();
-  void I0E_ASL();
-  void I0F_SLO();
-
-  void I10_BPL();
-  void I11_ORA();
-  void I12_KIL();
-  void I13_SLO();
-  void I14_DOP();
-  void I15_ORA();
-  void I16_ASL();
-  void I17_SLO();
-  void I18_CLC();
-  void I19_ORA();
-  void I1A_NOP();
-  void I1B_SLO();
-  void I1C_TOP();
-  void I1D_ORA();
-  void I1E_ASL();
-  void I1F_SLO();
-
-  void I20_JSR();
-  void I21_AND();
-  void I22_KIL();
-  void I23_RLA();
-  void I24_BIT();
-  void I25_AND();
-  void I26_ROL();
-  void I27_RLA();
-  void I28_PLP();
-  void I29_AND();
-  void I2A_ROL();
-  void I2B_AAC();
-  void I2C_BIT();
-  void I2D_AND();
-  void I2E_ROL();
-  void I2F_RLA();
-
-  void I30_BMI();
-  void I31_AND();
-  void I32_KIL();
-  void I33_RLA();
-  void I34_DOP();
-  void I35_AND();
-  void I36_ROL();
-  void I37_RLA();
-  void I38_SEC();
-  void I39_AND();
-  void I3A_NOP();
-  void I3B_RLA();
-  void I3C_TOP();
-  void I3D_AND();
-  void I3E_ROL();
-  void I3F_RLA();
-
-  void I40_RTI();
-  void I41_EOR();
-  void I42_KIL();
-  void I43_SRE();
-  void I44_DOP();
-  void I45_EOR();
-  void I46_LSR();
-  void I47_SRE();
-  void I48_PHA();
-  void I49_EOR();
-  void I4A_LSR();
-  void I4B_ASR();
-  void I4C_JMP();
-  void I4D_EOR();
-  void I4E_LSR();
-  void I4F_SRE();
-
-  void I50_BVC();
-  void I51_EOR();
-  void I52_KIL();
-  void I53_SRE();
-  void I54_DOP();
-  void I55_EOR();
-  void I56_LSR();
-  void I57_SRE();
-  void I58_CLI();
-  void I59_EOR();
-  void I5A_NOP();
-  void I5B_SRE();
-  void I5C_TOP();
-  void I5D_EOR();
-  void I5E_LSR();
-  void I5F_SRE();
-
-  void I60_RTS();
-  void I61_ADC();
-  void I62_KIL();
-  void I63_RRA();
-  void I64_DOP();
-  void I65_ADC();
-  void I66_ROR();
-  void I67_RRA();
-  void I68_PLA();
-  void I69_ADC();
-  void I6A_ROR();
-  void I6B_ARR();
-  void I6C_JMP();
-  void I6D_ADC();
-  void I6E_ROR();
-  void I6F_RRA();
-
-  void I70_BVS();
-  void I71_ADC();
-  void I72_KIL();
-  void I73_RRA();
-  void I74_DOP();
-  void I75_ADC();
-  void I76_ROR();
-  void I77_RRA();
-  void I78_SEI();
-  void I79_ADC();
-  void I7A_NOP();
-  void I7B_RRA();
-  void I7C_TOP();
-  void I7D_ADC();
-  void I7E_ROR();
-  void I7F_RRA();
-
-  void I80_DOP();
-  void I81_STA();
-  void I82_DOP();
-  void I83_AAX();
-  void I84_STY();
-  void I85_STA();
-  void I86_STX();
-  void I87_AAX();
-  void I88_DEY();
-  void I89_DOP();
-  void I8A_TXA();
-  void I8B_XAA();
-  void I8C_STY();
-  void I8D_STA();
-  void I8E_STX();
-  void I8F_AAX();
-
-  void I90_BCC();
-  void I91_STA();
-  void I92_KIL();
-  void I93_AXA();
-  void I94_STY();
-  void I95_STA();
-  void I96_STX();
-  void I97_AAX();
-  void I98_TYA();
-  void I99_STA();
-  void I9A_TXS();
-  void I9B_XAS();
-  void I9C_SYA();
-  void I9D_STA();
-  void I9E_SXA();
-  void I9F_AXA();
-
-  void IA0_LDY();
-  void IA1_LDA();
-  void IA2_LDX();
-  void IA3_LAX();
-  void IA4_LDY();
-  void IA5_LDA();
-  void IA6_LDX();
-  void IA7_LAX();
-  void IA8_TAY();
-  void IA9_LDA();
-  void IAA_TAX();
-  void IAB_ATX();
-  void IAC_LDY();
-  void IAD_LDA();
-  void IAE_LDX();
-  void IAF_LAX();
-
-  void IB0_BCS();
-  void IB1_LDA();
-  void IB2_KIL();
-  void IB3_LAX();
-  void IB4_LDY();
-  void IB5_LDA();
-  void IB6_LDX();
-  void IB7_LAX();
-  void IB8_CLV();
-  void IB9_LDA();
-  void IBA_TSX();
-  void IBB_LAR();
-  void IBC_LDY();
-  void IBD_LDA();
-  void IBE_LDX();
-  void IBF_LAX();
-
-  void IC0_CPY();
-  void IC1_CMP();
-  void IC2_DOP();
-  void IC3_DCP();
-  void IC4_CPY();
-  void IC5_CMP();
-  void IC6_DEC();
-  void IC7_DCP();
-  void IC8_INY();
-  void IC9_CMP();
-  void ICA_DEX();
-  void ICB_AXS();
-  void ICC_CPY();
-  void ICD_CMP();
-  void ICE_DEC();
-  void ICF_DCP();
-
-  void ID0_BNE();
-  void ID1_CMP();
-  void ID2_KIL();
-  void ID3_DCP();
-  void ID4_DOP();
-  void ID5_CMP();
-  void ID6_DEC();
-  void ID7_DCP();
-  void ID8_CLD();
-  void ID9_CMP();
-  void IDA_NOP();
-  void IDB_DCP();
-  void IDC_TOP();
-  void IDD_CMP();
-  void IDE_DEC();
-  void IDF_DCP();
-
-  void IE0_CPX();
-  void IE1_SBC();
-  void IE2_DOP();
-  void IE3_ISC();
-  void IE4_CPX();
-  void IE5_SBC();
-  void IE6_INC();
-  void IE7_ISC();
-  void IE8_INX();
-  void IE9_SBC();
-  void IEA_NOP();
-  void IEB_SBC();
-  void IEC_CPX();
-  void IED_SBC();
-  void IEE_INC();
-  void IEF_ISC();
-
-  void IF0_BEQ();
-  void IF1_SBC();
-  void IF2_KIL();
-  void IF3_ISC();
-  void IF4_DOP();
-  void IF5_SBC();
-  void IF6_INC();
-  void IF7_ISC();
-  void IF8_SED();
-  void IF9_SBC();
-  void IFA_NOP();
-  void IFB_ISC();
-  void IFC_TOP();
-  void IFD_SBC();
-  void IFE_INC();
-  void IFF_ISC();
+  ROWL(0, BRK, ORA, KIL, SLO, DOP, ORA, ASL, SLO)
+  ROWH(0, PHP, ORA, ASL, AAC, TOP, ORA, ASL, SLO)
+  ROWL(1, BPL, ORA, KIL, SLO, DOP, ORA, ASL, SLO)
+  ROWH(1, CLC, ORA, NOP, SLO, TOP, ORA, ASL, SLO)
+  ROWL(2, JSR, AND, KIL, RLA, BIT, AND, ROL, RLA)
+  ROWH(2, PLP, AND, ROL, AAC, BIT, AND, ROL, RLA)
+  ROWL(3, BMI, AND, KIL, RLA, DOP, AND, ROL, RLA)
+  ROWH(3, SEC, AND, NOP, RLA, TOP, AND, ROL, RLA)
+  ROWL(4, RTI, EOR, KIL, SRE, DOP, EOR, LSR, SRE)
+  ROWH(4, PHA, EOR, LSR, ASR, JMP, EOR, LSR, SRE)
+  ROWL(5, BVC, EOR, KIL, SRE, DOP, EOR, LSR, SRE)
+  ROWH(5, CLI, EOR, NOP, SRE, TOP, EOR, LSR, SRE)
+  ROWL(6, RTS, ADC, KIL, RRA, DOP, ADC, ROR, RRA)
+  ROWH(6, PLA, ADC, ROR, ARR, JMP, ADC, ROR, RRA)
+  ROWL(7, BVS, ADC, KIL, RRA, DOP, ADC, ROR, RRA)
+  ROWH(7, SEI, ADC, NOP, RRA, TOP, ADC, ROR, RRA)
+  ROWL(8, DOP, STA, DOP, AAX, STY, STA, STX, AAX)
+  ROWH(8, DEY, DOP, TXA, XAA, STY, STA, STX, AAX)
+  ROWL(9, BCC, STA, KIL, AXA, STY, STA, STX, AAX)
+  ROWH(9, TYA, STA, TXS, XAS, SYA, STA, SXA, AXA)
+  ROWL(A, LDY, LDA, LDX, LAX, LDY, LDA, LDX, LAX)
+  ROWH(A, TAY, LDA, TAX, ATX, LDY, LDA, LDX, LAX)
+  ROWL(B, BCS, LDA, KIL, LAX, LDY, LDA, LDX, LAX)
+  ROWH(B, CLV, LDA, TSX, LAR, LDY, LDA, LDX, LAX)
+  ROWL(C, CPY, CMP, DOP, DCP, CPY, CMP, DEC, DCP)
+  ROWH(C, INY, CMP, DEX, AXS, CPY, CMP, DEC, DCP)
+  ROWL(D, BNE, CMP, KIL, DCP, DOP, CMP, DEC, DCP)
+  ROWH(D, CLD, CMP, NOP, DCP, TOP, CMP, DEC, DCP)
+  ROWL(E, CPX, SBC, DOP, ISC, CPX, SBC, INC, ISC)
+  ROWH(E, INX, SBC, NOP, SBC, CPX, SBC, INC, ISC)
+  ROWL(F, BEQ, SBC, KIL, ISC, DOP, SBC, INC, ISC)
+  ROWH(F, SED, SBC, NOP, ISC, TOP, SBC, INC, ISC)
 
   // Dispatch table
   typedef void (CPU::*IFunPtr) ();
@@ -338,22 +111,22 @@ private:
   {
     struct
     {
-      // Negative flag (bit 7)
-      uint8_t N : 1;
-      // Overflow flag
-      uint8_t V : 1;
-      // Always 1 if pushed
-      uint8_t   : 1;
-      // Only exists on the stack
-      uint8_t B : 1;
-      // BCD flag
-      uint8_t D : 1;
-      // Interrupt priority level
-      uint8_t I : 1;
-      // Zero flag
-      uint8_t Z : 1;
       // Carry flag
       uint8_t C : 1;
+      // Zero flag
+      uint8_t Z : 1;
+      // Interrupt priority level
+      uint8_t I : 1;
+      // BCD flag
+      uint8_t D : 1;
+      // Only exists on the stack
+      uint8_t   : 1;
+      // Always 1 if pushed
+      uint8_t   : 1;
+      // Overflow flag
+      uint8_t V : 1;
+      // Negative flag (bit 7)
+      uint8_t N : 1;
     };
 
     uint8_t P;

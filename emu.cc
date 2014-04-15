@@ -16,7 +16,7 @@ Emulator::Init(const std::string& file)
 void
 Emulator::Run()
 {
-  for (int i = 0; i < 50; ++i)
+  for (int i = 0; i < 300; ++i)
   {
     cpu.Tick();
   }
