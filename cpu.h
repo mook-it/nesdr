@@ -40,10 +40,114 @@ private:
   void PushWord(uint16_t word);
 
   /**
+   * Pushes a byte on the stack, decrementing the stack pointer
+   */
+  void PushByte(uint8_t byte);
+
+  /**
    * Pops a word from the stack and increments the stack pointer
    * @returns 16 bit value popped from the stack
    */
   uint16_t PopWord();
+
+  /**
+   * Pops a byte from the stack, incrementing the stack pointer
+   */
+  uint8_t PopByte();
+
+private:
+
+  /**
+   * Moves data between registers or memory
+   */
+  template<uint8_t (CPU::*Read)(uint16_t &),
+           void (CPU::*Write)(uint16_t, uint8_t),
+           bool flags = true>
+  inline void Move()
+  {
+    uint16_t addr;
+    uint8_t M;
+
+    M = (this->*Read)(addr);
+    if (flags)
+    {
+      Z = M == 0;
+      N = M & 0x80 ? 1 : 0;
+    }
+
+    (this->*Write)(addr, M);
+  }
+
+  /**
+   * Conditional branch
+   */
+  template<bool (CPU::*Read)(), bool ref>
+  inline void Branch()
+  {
+    PC += ((this->*Read)() == ref) ? (int8_t)ReadImmediate() : 1;
+  }
+
+  /**
+   * Rotate Right
+   */
+  template<uint8_t (CPU::*Read)(uint16_t &),
+           void (CPU::*Write)(uint16_t, uint8_t)>
+  inline void ROR()
+  {
+    uint16_t addr;
+    uint8_t M, oldCarry;
+
+    M = (this->*Read)(addr);
+
+    oldCarry = M & 0x1;
+    M = (C << 7) | (M >> 1);
+    C = oldCarry;
+    Z = M == 0;
+    N = M & 0x80 ? 1 : 0;
+
+    (this->*Write)(addr, M);
+  }
+
+  /**
+   * Rotate Left
+   */
+  template<uint8_t (CPU::*Read)(uint16_t &),
+           void (CPU::*Write)(uint16_t, uint8_t)>
+  inline void ROL()
+  {
+    uint16_t addr;
+    uint8_t M, oldCarry;
+
+    M = (this->*Read)(addr);
+
+    oldCarry = M & 0x80;
+    M = C | (M << 1);
+    C = oldCarry ? 1 : 0;
+    Z = M == 0;
+    N = M & 0x80 ? 1 : 0;
+
+    (this->*Write)(addr, M);
+  }
+
+  inline bool ReadC() { return C; }
+  inline bool ReadZ() { return Z; }
+  inline bool ReadV() { return V; }
+  inline bool ReadN() { return N; }
+  inline uint8_t ReadA(uint16_t &addr) { addr = 0; return A; }
+  inline uint8_t ReadX(uint16_t &addr) { addr = 0; return X; }
+  inline uint8_t ReadY(uint16_t &addr) { addr = 0; return Y; }
+  inline uint8_t ReadS(uint16_t &addr) { addr = 0; return S; }
+  uint8_t ReadImmediate(uint16_t &addr);
+  uint8_t ReadImmediate();
+  uint8_t ReadAbsolute(uint16_t &addr);
+  uint8_t ReadZeroPage(uint16_t &addr);
+  void WriteA(uint16_t addr, uint8_t v) { A = v; }
+  void WriteX(uint16_t addr, uint8_t v) { X = v; }
+  void WriteY(uint16_t addr, uint8_t v) { Y = v; }
+  void WriteS(uint16_t addr, uint8_t v) { S = v; }
+  void WriteZeroPageX(uint16_t addr, uint8_t v);
+  void WriteZeroPageY(uint16_t addr, uint8_t v);
+  void WriteAbsolute(uint16_t addr, uint8_t v);
 
 private:
 
@@ -80,6 +184,7 @@ private:
   ROWH(E, INX, SBC, NOP, SBC, CPX, SBC, INC, ISC)
   ROWL(F, BEQ, SBC, KIL, ISC, DOP, SBC, INC, ISC)
   ROWH(F, SED, SBC, NOP, ISC, TOP, SBC, INC, ISC)
+  #undef I
 
   // Dispatch table
   typedef void (CPU::*IFunPtr) ();

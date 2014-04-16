@@ -92,5 +92,5 @@ Memory::WriteByte(uint16_t addr, uint8_t byte)
   }
 
   std::cerr << std::hex << addr << " " << (int)byte << std::endl;
-  throw std::runtime_error("Unimplemented");
+  throw std::runtime_error("Illegal access");
 }
