@@ -58,7 +58,6 @@ public:
   {
     return ram[addr];
   }
-
   /**
    * Reads a 16 bit word from memory, little endian order
    * @param addr 16 bit address

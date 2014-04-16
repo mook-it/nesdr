@@ -10,6 +10,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <functional>
 #include <exception>
 #include <stdexcept>
 #include <memory>
@@ -17,6 +18,7 @@
 #include <sstream>
 #include <stdint.h>
 #include <getopt.h>
+using namespace std;
 
 class Emulator;
 

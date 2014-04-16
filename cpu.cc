@@ -90,6 +90,20 @@ CPU::ReadAbsolute(uint16_t &addr)
   return emu.mem.ReadByte(addr);
 }
 
+inline uint8_t
+CPU::ReadIndexedIndirectX(uint16_t &addr)
+{
+  addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
+  return emu.mem.ReadByte(addr);
+}
+
+inline uint8_t
+CPU::ReadIndexedIndirectY(uint16_t &addr)
+{
+  addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
+  return emu.mem.ReadByte(addr);
+}
+
 inline void
 CPU::WriteAbsolute(uint16_t addr, uint8_t v)
 {
@@ -103,12 +117,17 @@ CPU::WriteAbsolute(uint16_t addr, uint8_t v)
 }
 
 void
+CPU::WriteZeroPage(uint16_t addr, uint8_t v)
+{
+  emu.mem.WriteByte(addr ? addr : addr = emu.mem.ReadByte(PC++), v);
+}
+
+void
 CPU::WriteZeroPageX(uint16_t addr, uint8_t v)
 {
   if (!addr)
   {
-    addr = (emu.mem.ReadByte(PC) + X) & 0xFF;
-    PC++;
+    addr = (emu.mem.ReadByte(PC++) + X) & 0xFF;
   }
 
   emu.mem.WriteByte(addr, v);
@@ -119,8 +138,52 @@ CPU::WriteZeroPageY(uint16_t addr, uint8_t v)
 {
   if (!addr)
   {
-    addr = (emu.mem.ReadByte(PC) + Y) & 0xFF;
-    PC++;
+    addr = (emu.mem.ReadByte(PC++) + Y) & 0xFF;
+  }
+
+  emu.mem.WriteByte(addr, v);
+}
+
+void
+CPU::WriteIndexedIndirectX(uint16_t addr, uint8_t v)
+{
+  if (!addr)
+  {
+    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
+  }
+
+  emu.mem.WriteByte(addr, v);
+}
+
+void
+CPU::WriteIndexedIndirectY(uint16_t addr, uint8_t v)
+{
+  if (!addr)
+  {
+    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
+  }
+
+  emu.mem.WriteByte(addr, v);
+}
+
+
+void
+CPU::WriteIndirectIndexedX(uint16_t addr, uint8_t v)
+{
+  if (!addr)
+  {
+    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
+  }
+
+  emu.mem.WriteByte(addr, v);
+}
+
+void
+CPU::WriteIndirectIndexedY(uint16_t addr, uint8_t v)
+{
+  if (!addr)
+  {
+    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
   }
 
   emu.mem.WriteByte(addr, v);
@@ -134,17 +197,6 @@ CPU::WriteZeroPageY(uint16_t addr, uint8_t v)
 #define SETN(expr) N = ((expr) != 0) ? 1 : 0;
 #define SETV(expr) V = ((expr) != 0) ? 1 : 0;
 #define SETC(expr) C = ((expr) != 0) ? 1 : 0;
-
-#define ARG_ZEROPAGE\
-   emu.mem.ReadByteZeroPage(emu.mem.ReadByte(PC++));
-#define ARG_ZEROPAGE_X\
- emu.mem.ReadByteZeroPage((X + emu.mem.ReadByte(PC++)) & 0xFF);
-#define ARG_ZEROPAGE_Y\
- emu.mem.ReadByteZeroPage((Y + emu.mem.ReadByte(PC++)) & 0xFF);
-#define ARG_ABSOLUTE\
-   emu.mem.ReadByte(emu.mem.ReadWord(PC)), PC += 2
-#define ARG_ABSOLUTE_X\
-   emu.mem.ReadByte(emu.mem.ReadWord(PC) + X), PC += 2
 
 #define HEADER(name, code)\
 void \
@@ -185,40 +237,6 @@ SET(I78_SEI, I);
 SET(IF8_SED, D);
 
 // -----------------------------------------------------------------------------
-// Store zero page
-// -----------------------------------------------------------------------------
-#define STOREZP(name, expr)\
-void \
-CPU::name()\
-{\
-  emu.mem.WriteByteZeroPage(emu.mem.ReadByte(PC++), expr);\
-}
-
-STOREZP(I84_STY, Y);
-STOREZP(I85_STA, A);
-STOREZP(I86_STX, X);
-
-// -----------------------------------------------------------------------------
-// Bitwise operators
-// -----------------------------------------------------------------------------
-#define LOGIC_IMM(name, op, reg)\
-void \
-CPU::name()\
-{\
-  reg = reg op emu.mem.ReadByte(PC++);\
-  SETZ(reg == 0x00);\
-  SETN(reg & 0x80);\
-}
-
-LOGIC_IMM(I09_ORA, |, A);
-LOGIC_IMM(I29_AND, &, A);
-LOGIC_IMM(I49_EOR, ^, A);
-
-// -----------------------------------------------------------------------------
-// Logical operators
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 // Stack operations
 // -----------------------------------------------------------------------------
 #define PUSH(name, reg)\
@@ -250,23 +268,6 @@ CPU::I68_PLA()
 }
 
 // -----------------------------------------------------------------------------
-// Comparisons
-// -----------------------------------------------------------------------------
-#define CMP_IMM(name, reg)\
-void \
-CPU::name()\
-{\
-  uint8_t M = emu.mem.ReadByte(PC++);\
-  SETZ(reg == M);\
-  SETC(reg >= M)\
-  SETN((reg - M) & 0x80);\
-}
-
-CMP_IMM(IC0_CPY, Y);
-CMP_IMM(IC9_CMP, A);
-CMP_IMM(IE0_CPX, X);
-
-// -----------------------------------------------------------------------------
 // Decrement/increment
 // -----------------------------------------------------------------------------
 #define DEC(name, reg)\
@@ -287,14 +288,14 @@ DEC(ICA_DEX, X);
 // Other instructions
 // -----------------------------------------------------------------------------
 UNDEF(I00_BRK);
-UNDEF(I01_ORA);
+void CPU::I01_ORA() { Bitwise<&CPU::ReadIndexedIndirectX, bit_or<uint8_t>>(); }
 UNDEF(I02_KIL);
 UNDEF(I03_SLO);
 UNDEF(I04_DOP);
 UNDEF(I05_ORA);
 UNDEF(I06_ASL);
 UNDEF(I07_SLO);
-
+void CPU::I09_ORA() { Bitwise<&CPU::ReadImmediate, bit_or<uint8_t>>(); }
 void
 CPU::I0A_ASL()
 {
@@ -303,7 +304,6 @@ CPU::I0A_ASL()
   SETZ(A == 0);
   SETN(A & 0x80);
 }
-
 UNDEF(I0B_AAC);
 UNDEF(I0C_TOP);
 UNDEF(I0D_ORA);
@@ -324,18 +324,15 @@ UNDEF(I1C_TOP);
 UNDEF(I1D_ORA);
 UNDEF(I1E_ASL);
 UNDEF(I1F_SLO);
-
 void
 CPU::I20_JSR()
 {
   PushWord(PC + 1);
   PC = emu.mem.ReadWord(PC);
 }
-
-UNDEF(I21_AND);
+void CPU::I21_AND() { Bitwise<&CPU::ReadIndexedIndirectX, bit_and<uint8_t>>(); }
 UNDEF(I22_KIL);
 UNDEF(I23_RLA);
-
 void
 CPU::I24_BIT()
 {
@@ -346,10 +343,10 @@ CPU::I24_BIT()
   SETV(M & 0x40);
   SETN(M & 0x80);
 }
-
 UNDEF(I25_AND);
 UNDEF(I26_ROL);
 UNDEF(I27_RLA);
+void CPU::I29_AND() { Bitwise<&CPU::ReadImmediate, bit_and<uint8_t>>(); }
 UNDEF(I2B_AAC);
 UNDEF(I2C_BIT);
 UNDEF(I2D_AND);
@@ -370,22 +367,20 @@ UNDEF(I3C_TOP);
 UNDEF(I3D_AND);
 UNDEF(I3E_ROL);
 UNDEF(I3F_RLA);
-
 void
 CPU::I40_RTI()
 {
   P = PopByte() | 0x20;
   PC = PopWord();
 }
-
-UNDEF(I41_EOR);
+void CPU::I41_EOR() { Bitwise<&CPU::ReadIndexedIndirectX, bit_xor<uint8_t>>(); }
 UNDEF(I42_KIL);
 UNDEF(I43_SRE);
 UNDEF(I44_DOP);
 UNDEF(I45_EOR);
 UNDEF(I46_LSR);
 UNDEF(I47_SRE);
-
+void CPU::I49_EOR() { Bitwise<&CPU::ReadImmediate, bit_xor<uint8_t>>(); }
 void
 CPU::I4A_LSR()
 {
@@ -444,18 +439,8 @@ CPU::I69_ADC()
   A = r;
 }
 
-void
-CPU::I6A_ROR()
-{
-  ROR<&CPU::ReadA, &CPU::WriteA>();
-}
-
-void
-CPU::I2A_ROL()
-{
-  ROL<&CPU::ReadA, &CPU::WriteA>();
-}
-
+void CPU::I6A_ROR() { ROR<&CPU::ReadA, &CPU::WriteA>(); }
+void CPU::I2A_ROL() { ROL<&CPU::ReadA, &CPU::WriteA>(); }
 UNDEF(I6B_ARR);
 UNDEF(I6C_JMP);
 UNDEF(I6D_ADC);
@@ -477,9 +462,12 @@ UNDEF(I7D_ADC);
 UNDEF(I7E_ROR);
 UNDEF(I7F_RRA);
 UNDEF(I80_DOP);
-UNDEF(I81_STA);
+void CPU::I81_STA() { Move<&CPU::ReadA, &CPU::WriteIndexedIndirectX, false>(); }
 UNDEF(I82_DOP);
 UNDEF(I83_AAX);
+void CPU::I84_STY() { Move<&CPU::ReadY, &CPU::WriteZeroPage, false>(); }
+void CPU::I85_STA() { Move<&CPU::ReadA, &CPU::WriteZeroPage, false>(); }
+void CPU::I86_STX() { Move<&CPU::ReadX, &CPU::WriteZeroPage, false>(); }
 UNDEF(I87_AAX);
 UNDEF(I89_DOP);
 void CPU::I8A_TXA() { Move<&CPU::ReadX, &CPU::WriteA>(); }
@@ -489,11 +477,7 @@ void CPU::I8D_STA() { Move<&CPU::ReadA, &CPU::WriteAbsolute, false>(); }
 void CPU::I8E_STX() { Move<&CPU::ReadX, &CPU::WriteAbsolute, false>(); }
 UNDEF(I8F_AAX);
 void CPU::I90_BCC() { Branch<&CPU::ReadC, false>(); };
-void
-CPU::I91_STA()
-{
-  emu.mem.WriteByte(emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y, A);
-}
+void CPU::I91_STA() { Move<&CPU::ReadA, &CPU::WriteIndirectIndexedY, false>(); }
 UNDEF(I92_KIL);
 UNDEF(I93_AXA);
 UNDEF(I94_STY);
@@ -509,7 +493,7 @@ void CPU::I9D_STA() { Move<&CPU::ReadA, &CPU::WriteAbsolute, false>(); }
 UNDEF(I9E_SXA);
 UNDEF(I9F_AXA);
 void CPU::IA0_LDY() { Move<&CPU::ReadImmediate, &CPU::WriteY>(); }
-UNDEF(IA1_LDA);
+void CPU::IA1_LDA() { Move<&CPU::ReadIndexedIndirectX, &CPU::WriteA>(); }
 void CPU::IA2_LDX() { Move<&CPU::ReadImmediate, &CPU::WriteX>(); }
 UNDEF(IA3_LAX);
 void CPU::IA4_LDY() { Move<&CPU::ReadZeroPage, &CPU::WriteY>(); }
@@ -539,6 +523,7 @@ UNDEF(IBC_LDY);
 UNDEF(IBD_LDA);
 UNDEF(IBE_LDX);
 UNDEF(IBF_LAX);
+void CPU::IC0_CPY() { CMP<&CPU::ReadY, &CPU::ReadImmediate>(); }
 UNDEF(IC1_CMP);
 UNDEF(IC2_DOP);
 UNDEF(IC3_DCP);
@@ -552,6 +537,7 @@ CPU::IC8_INY()
   Z = Y == 0;
   N = Y & 0x80;
 }
+void CPU::IC9_CMP() { CMP<&CPU::ReadA, &CPU::ReadImmediate>(); }
 UNDEF(ICB_AXS);
 UNDEF(ICC_CPY);
 UNDEF(ICD_CMP);
@@ -572,6 +558,7 @@ UNDEF(IDC_TOP);
 UNDEF(IDD_CMP);
 UNDEF(IDE_DEC);
 UNDEF(IDF_DCP);
+void CPU::IE0_CPX() { CMP<&CPU::ReadX, &CPU::ReadImmediate>(); }
 UNDEF(IE1_SBC);
 UNDEF(IE2_DOP);
 UNDEF(IE3_ISC);

@@ -88,6 +88,19 @@ private:
   }
 
   /**
+   * Bitwise or
+   */
+  template<uint8_t (CPU::*Read)(uint16_t &), typename Op>
+  inline void Bitwise()
+  {
+    uint16_t addr;
+    Op op;
+    A = op(A, (this->*Read)(addr));
+    Z = A == 0;
+    N = A & 0x80 ? 1 : 0;
+  }
+
+  /**
    * Rotate Right
    */
   template<uint8_t (CPU::*Read)(uint16_t &),
@@ -129,6 +142,24 @@ private:
     (this->*Write)(addr, M);
   }
 
+  /**
+   * Compare
+   */
+  template<uint8_t (CPU::*ReadR)(uint16_t &),
+           uint8_t (CPU::*ReadM)(uint16_t &)>
+  inline void CMP()
+  {
+    uint16_t addr;
+    uint8_t M, R;
+
+    M = (this->*ReadM)(addr);
+    R = (this->*ReadR)(addr);
+
+    Z = M == R;
+    C = R >= M;
+    N = ((R - M) & 0x80) ? 1 : 0;
+  }
+
   inline bool ReadC() { return C; }
   inline bool ReadZ() { return Z; }
   inline bool ReadV() { return V; }
@@ -139,15 +170,22 @@ private:
   inline uint8_t ReadS(uint16_t &addr) { addr = 0; return S; }
   uint8_t ReadImmediate(uint16_t &addr);
   uint8_t ReadImmediate();
-  uint8_t ReadAbsolute(uint16_t &addr);
   uint8_t ReadZeroPage(uint16_t &addr);
+  uint8_t ReadAbsolute(uint16_t &addr);
+  uint8_t ReadIndexedIndirectX(uint16_t &addr);
+  uint8_t ReadIndexedIndirectY(uint16_t &addr);
   void WriteA(uint16_t addr, uint8_t v) { A = v; }
   void WriteX(uint16_t addr, uint8_t v) { X = v; }
   void WriteY(uint16_t addr, uint8_t v) { Y = v; }
   void WriteS(uint16_t addr, uint8_t v) { S = v; }
+  void WriteZeroPage(uint16_t addr, uint8_t v);
   void WriteZeroPageX(uint16_t addr, uint8_t v);
   void WriteZeroPageY(uint16_t addr, uint8_t v);
   void WriteAbsolute(uint16_t addr, uint8_t v);
+  void WriteIndexedIndirectX(uint16_t addr, uint8_t v);
+  void WriteIndexedIndirectY(uint16_t addr, uint8_t v);
+  void WriteIndirectIndexedX(uint16_t addr, uint8_t v);
+  void WriteIndirectIndexedY(uint16_t addr, uint8_t v);
 
 private:
 
