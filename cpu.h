@@ -60,22 +60,23 @@ private:
   /**
    * Moves data between registers or memory
    */
-  template<uint8_t (CPU::*Read)(uint16_t &),
-           void (CPU::*Write)(uint16_t, uint8_t),
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
+           void (CPU::*Write)(uint16_t, bool c, uint8_t),
            bool flags = true>
   inline void Move()
   {
     uint16_t addr;
     uint8_t M;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
     if (flags)
     {
       Z = M == 0;
       N = M & 0x80 ? 1 : 0;
     }
 
-    (this->*Write)(addr, M);
+    (this->*Write)(addr, c, M);
   }
 
   /**
@@ -99,14 +100,15 @@ private:
   /**
    * Bitwise or
    */
-  template<uint8_t (CPU::*Read)(uint16_t &), typename Op>
+  template<typename Op, uint8_t (CPU::*Read)(uint16_t &, bool &)>
   inline void Bitwise()
   {
     uint16_t addr;
     uint8_t M;
+    bool c;
     Op op;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
     A = op(A, M);
     Z = A == 0;
     N = A & 0x80 ? 1 : 0;
@@ -115,13 +117,14 @@ private:
   /**
    * Bit test
    */
-  template<uint8_t (CPU::*Read)(uint16_t &)>
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &)>
   inline void BIT()
   {
     uint16_t addr;
     uint8_t M;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
     Z = (A & M) == 0;
     V = M & 0x40 ? 1 : 0;
     N = M & 0x80 ? 1 : 0;
@@ -130,14 +133,15 @@ private:
   /**
    * Rotate Right
    */
-  template<uint8_t (CPU::*Read)(uint16_t &),
-           void (CPU::*Write)(uint16_t, uint8_t)>
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
+           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
   inline void ROR()
   {
-    uint16_t addr;
     uint8_t M, oldCarry;
+    uint16_t addr;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
 
     oldCarry = M & 0x1;
     M = (C << 7) | (M >> 1);
@@ -145,20 +149,21 @@ private:
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
 
-    (this->*Write)(addr, M);
+    (this->*Write)(addr, c, M);
   }
 
   /**
    * Rotate Left
    */
-  template<uint8_t (CPU::*Read)(uint16_t &),
-           void (CPU::*Write)(uint16_t, uint8_t)>
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
+           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
   inline void ROL()
   {
-    uint16_t addr;
     uint8_t M, oldCarry;
+    uint16_t addr;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
 
     oldCarry = M & 0x80;
     M = C | (M << 1);
@@ -166,58 +171,61 @@ private:
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
 
-    (this->*Write)(addr, M);
+    (this->*Write)(addr, c, M);
   }
 
   /**
    * Arithmetic shift left
    */
-  template<uint8_t (CPU::*Read)(uint16_t &),
-           void (CPU::*Write)(uint16_t, uint8_t)>
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
+           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
   inline void ASL()
   {
     uint16_t addr;
     uint8_t M;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
 
     C = M & 0x80 ? 1 : 0;
     M <<= 1;
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
 
-    (this->*Write)(addr, M);
+    (this->*Write)(addr, c, M);
   }
 
   /**
    * Logical shift right
    */
-  template<uint8_t (CPU::*Read)(uint16_t &),
-           void (CPU::*Write)(uint16_t, uint8_t)>
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
+           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
   inline void LSR()
   {
     uint16_t addr;
     uint8_t M;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
 
     C = M & 0x01;
     M >>= 1;
     Z = M == 0;
     N = 0;
 
-    (this->*Write)(addr, M);
+    (this->*Write)(addr, c, M);
   }
 
   /**
    * Add with carry
    */
-  template<uint8_t (CPU::*Read)(uint16_t &)>
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &)>
   inline void ADC()
   {
     uint16_t addr, r, M;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
     r = M + A + C;
 
     C = r & 0xFF00 ? 1 : 0;
@@ -231,12 +239,13 @@ private:
   /**
    * Subtract with carry
    */
-  template<uint8_t (CPU::*Read)(uint16_t &)>
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &)>
   inline void SBC()
   {
     uint16_t r, M, addr;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
     r = A - M - !C;
 
     C = !(r & 0xFF00);
@@ -250,15 +259,16 @@ private:
   /**
    * Compare
    */
-  template<uint8_t (CPU::*ReadR)(uint16_t &),
-           uint8_t (CPU::*ReadM)(uint16_t &)>
+  template<uint8_t (CPU::*ReadR)(uint16_t &, bool &),
+           uint8_t (CPU::*ReadM)(uint16_t &, bool &)>
   inline void CMP()
   {
     uint16_t addr;
     uint8_t M, R;
+    bool c;
 
-    M = (this->*ReadM)(addr);
-    R = (this->*ReadR)(addr);
+    M = (this->*ReadM)(addr, c);
+    R = (this->*ReadR)(addr, c);
 
     Z = M == R;
     C = R >= M;
@@ -268,21 +278,24 @@ private:
   /**
    * Increment or decrement by a constant
    */
-  template<uint8_t (CPU::*Read)(uint16_t &),
-           void (CPU::*Write)(uint16_t, uint8_t),
+  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
+           void (CPU::*Write)(uint16_t, bool, uint8_t),
            int8_t V>
   inline void IncDec()
   {
     uint16_t addr;
     uint8_t M;
+    bool c;
 
-    M = (this->*Read)(addr);
+    M = (this->*Read)(addr, c);
     M += V;
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
 
-    (this->*Write)(addr, M);
+    (this->*Write)(addr, c, M);
   }
+
+private:
 
   inline bool ReadC() { return C; }
   inline bool ReadZ() { return Z; }
@@ -295,28 +308,66 @@ private:
   inline void SetN(bool v) { N = v ? 1 : 0; }
   inline void SetD(bool v) { D = v ? 1 : 0; }
   inline void SetI(bool v) { I = v ? 1 : 0; }
-  inline uint8_t ReadA(uint16_t &addr) { addr = 0; return A; }
-  inline uint8_t ReadX(uint16_t &addr) { addr = 0; return X; }
-  inline uint8_t ReadY(uint16_t &addr) { addr = 0; return Y; }
-  inline uint8_t ReadS(uint16_t &addr) { addr = 0; return S; }
-  uint8_t ReadImmediate(uint16_t &addr);
+
+private:
+
   uint8_t ReadImmediate();
-  uint8_t ReadZeroPage(uint16_t &addr);
-  uint8_t ReadAbsolute(uint16_t &addr);
-  uint8_t ReadIndexedIndirectX(uint16_t &addr);
-  uint8_t ReadIndexedIndirectY(uint16_t &addr);
-  void WriteA(uint16_t addr, uint8_t v) { A = v; }
-  void WriteX(uint16_t addr, uint8_t v) { X = v; }
-  void WriteY(uint16_t addr, uint8_t v) { Y = v; }
-  void WriteS(uint16_t addr, uint8_t v) { S = v; }
-  void WriteZeroPage(uint16_t addr, uint8_t v);
-  void WriteZeroPageX(uint16_t addr, uint8_t v);
-  void WriteZeroPageY(uint16_t addr, uint8_t v);
-  void WriteAbsolute(uint16_t addr, uint8_t v);
-  void WriteIndexedIndirectX(uint16_t addr, uint8_t v);
-  void WriteIndexedIndirectY(uint16_t addr, uint8_t v);
-  void WriteIndirectIndexedX(uint16_t addr, uint8_t v);
-  void WriteIndirectIndexedY(uint16_t addr, uint8_t v);
+  uint8_t ReadImmediate(uint16_t &addr, bool &c);
+  uint8_t ReadZeroPage(uint16_t &addr, bool &c);
+  uint8_t ReadZeroPageX(uint16_t &addr, bool &c);
+  uint8_t ReadZeroPageY(uint16_t &addr, bool &c);
+  uint8_t ReadAbsolute(uint16_t &addr, bool &c);
+  uint8_t ReadAbsoluteX(uint16_t &addr, bool &c);
+  uint8_t ReadAbsoluteY(uint16_t &addr, bool &c);
+  uint8_t ReadIndexedIndirectX(uint16_t &addr, bool &c);
+  uint8_t ReadIndexedIndirectY(uint16_t &addr, bool &c);
+  uint8_t ReadIndirectIndexedX(uint16_t &addr, bool &c);
+  uint8_t ReadIndirectIndexedY(uint16_t &addr, bool &c);
+
+  inline uint8_t ReadA(uint16_t &addr, bool &c)
+  {
+    addr = 0;
+    c = false;
+    return A;
+  }
+
+  inline uint8_t ReadX(uint16_t &addr, bool &c)
+  {
+    addr = 0;
+    c = false;
+    return X;
+  }
+
+  inline uint8_t ReadY(uint16_t &addr, bool &c)
+  {
+    addr = 0;
+    c = false;
+    return Y;
+  }
+
+  inline uint8_t ReadS(uint16_t &addr, bool &c)
+  {
+    addr = 0;
+    c = false;
+    return S;
+  }
+
+private:
+
+  void WriteA(uint16_t addr, bool c, uint8_t v) { A = v; }
+  void WriteX(uint16_t addr, bool c, uint8_t v) { X = v; }
+  void WriteY(uint16_t addr, bool c, uint8_t v) { Y = v; }
+  void WriteS(uint16_t addr, bool c, uint8_t v) { S = v; }
+  void WriteZeroPage(uint16_t addr, bool c, uint8_t v);
+  void WriteZeroPageX(uint16_t addr, bool c, uint8_t v);
+  void WriteZeroPageY(uint16_t addr, bool c, uint8_t v);
+  void WriteAbsolute(uint16_t addr, bool c, uint8_t v);
+  void WriteAbsoluteX(uint16_t addr, bool c, uint8_t v);
+  void WriteAbsoluteY(uint16_t addr, bool c, uint8_t v);
+  void WriteIndexedIndirectX(uint16_t addr, bool c, uint8_t v);
+  void WriteIndexedIndirectY(uint16_t addr, bool c, uint8_t v);
+  void WriteIndirectIndexedX(uint16_t addr, bool c, uint8_t v);
+  void WriteIndirectIndexedY(uint16_t addr, bool c, uint8_t v);
 
 private:
 
