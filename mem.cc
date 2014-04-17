@@ -6,10 +6,19 @@
 void
 Memory::LoadINes(const std::string& nes)
 {
+  // Load the file
   cart.reset(new INes(nes));
-  if (emu.verbose)
+
+  // Create the mapper
+  switch (cart->GetMapper())
   {
-    cart->Dump(std::cout);
+    case 0x00: mapper.reset(new MMC0(*this, *cart)); break;
+    case 0x01: mapper.reset(new MMC1(*this, *cart)); break;
+    default:
+    {
+      throw std::runtime_error("Unsupported mapper");
+      break;
+    }
   }
 }
 
@@ -69,28 +78,34 @@ Memory::WriteByte(uint16_t addr, uint8_t byte)
     return;
   }
 
-  // Mapper controls
-  if (addr >= 0x8000)
+  // Mapper register commands
+  if (addr & 0x8000)
   {
-    std::cerr << "Mapper: " << std::hex << addr << " " << (int)byte << std::endl;
+    mapper->Write(addr, byte);
     return;
   }
 
   // SRAM
   if (addr >= 0x6000)
   {
-    std::cerr << "SRAM: " << std::hex << addr << " " << (int)byte << std::endl;
+    if (addr >= 0x6004)
+    {
+      std::cout << byte;
+    }
     return;
   }
 
-  // Mirrored RAM
-  if (addr < 0x2000)
+  if (addr >= 0x4000)
   {
-    std::cerr << std::hex << addr << " " << (int)byte << std::endl;
-    memory[addr & 0x07FF] = byte;
+    //std::cout << "SRAM: " << std::hex << addr << " " << (int)byte << std::endl;
     return;
   }
 
-  std::cerr << std::hex << addr << " " << (int)byte << std::endl;
-  throw std::runtime_error("Illegal access");
+  if (addr >= 0x2000)
+  {
+    //std::cout << "SRAM: " << std::hex << addr << " " << (int)byte << std::endl;
+    return;
+  }
+
+  memory[addr & 0x07FF] = byte;
 }

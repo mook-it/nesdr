@@ -7,6 +7,7 @@ SET(SOURCES apu.cc
             ines.cc
             mem.cc
             ppu.cc
+            mmc.cc
    )
 
 SET(HEADERS apu.h
@@ -15,6 +16,7 @@ SET(HEADERS apu.h
             ines.h
             mem.h
             ppu.h
+            mmc.h
    )
 
 SET(LIBS

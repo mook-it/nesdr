@@ -29,7 +29,7 @@ public:
   /**
    * Prints information about the file to a stream
    */
-  void Dump(std::ostream& os);
+  void Dump(std::ostream& os) const;
 
   /**
    * Retrieves the PRG rom
@@ -37,6 +37,14 @@ public:
   const std::vector<uint8_t>& GetPRGRom() const
   {
     return prgROMData;
+  }
+
+  /**
+   * Retrievs the mapper number
+   */
+  uint8_t GetMapper() const
+  {
+    return mapper;
   }
 
 private:

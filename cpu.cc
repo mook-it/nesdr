@@ -9,9 +9,14 @@
 void
 CPU::Start()
 {
-  PC = 0xC000;//emu.mem.ReadWord(0xFFFC);
+  PC = emu.mem.ReadWord(0xFFFC);
   S = 0xFD;
-  P = 0x24;
+  C = 0;
+  Z = 0;
+  I = 1;
+  D = 0;
+  V = 0;
+  N = 0;
 }
 
 void
@@ -22,14 +27,25 @@ CPU::Tick()
   op = emu.mem.ReadByte(PC++);
   static int i;
 
-  std::cerr << std::setw(4) << std::dec << i + 1 << " "
-            << std::setw(4) << std::hex << PC - 1 << " "
-            << std::setw(2) << (int)op
-            << std::setw(6) << (int)A << " "
-            << std::setw(2) << (int)X << " "
-            << std::setw(2) << (int)Y << " "
-            << std::setw(2) << (int)(P & 0xEF) << " "
-            << std::setw(2) << (int)S << std::endl;
+  uint8_t P = 0x20;
+  P |= C ? 0x01 : 0x00;
+  P |= Z ? 0x02 : 0x00;
+  P |= I ? 0x04 : 0x00;
+  P |= D ? 0x08 : 0x00;
+  P |= V ? 0x40 : 0x00;
+  P |= N ? 0x80 : 0x00;
+
+  if (emu.verbose)
+  {
+    std::cerr << std::setw(4) << std::dec << i + 1 << " "
+              << std::setw(4) << std::hex << PC - 1 << " "
+              << std::setw(2) << (int)op
+              << std::setw(6) << (int)A << " "
+              << std::setw(2) << (int)X << " "
+              << std::setw(2) << (int)Y << " "
+              << std::setw(2) << (int)P << " "
+              << std::setw(2) << (int)S << std::endl;
+  }
   ++i;
   (this->*(IFunTable[op])) ();
 }
@@ -328,6 +344,7 @@ void CPU::I61_ADC() { ADC<&CPU::ReadIndexedIndirectX>(); }
 void CPU::I71_ADC() { ADC<&CPU::ReadIndirectIndexedY>(); }
 
 void CPU::IE9_SBC() { SBC<&CPU::ReadImmediate>(); }
+void CPU::IEB_SBC() { SBC<&CPU::ReadImmediate>(); }
 void CPU::IE5_SBC() { SBC<&CPU::ReadZeroPage>(); }
 void CPU::IF5_SBC() { SBC<&CPU::ReadZeroPageX>(); }
 void CPU::IED_SBC() { SBC<&CPU::ReadAbsolute>(); }
@@ -371,42 +388,122 @@ void CPU::I2C_BIT() { BIT<&CPU::ReadAbsolute>(); }
 // -----------------------------------------------------------------------------
 // Control Flow
 // -----------------------------------------------------------------------------
-void CPU::I00_BRK() { std::cout << "I00_BRK" << std::endl; exit(0); }
 void CPU::IEA_NOP() { }
 
-void CPU::I10_BPL() { Branch<&CPU::ReadN, false>(); }
-void CPU::I50_BVC() { Branch<&CPU::ReadV, false>(); }
-void CPU::I90_BCC() { Branch<&CPU::ReadC, false>(); }
-void CPU::ID0_BNE() { Branch<&CPU::ReadZ, false>(); }
-void CPU::I30_BMI() { Branch<&CPU::ReadN, true>(); }
-void CPU::I70_BVS() { Branch<&CPU::ReadV, true>(); }
-void CPU::IB0_BCS() { Branch<&CPU::ReadC, true>(); }
-void CPU::IF0_BEQ() { Branch<&CPU::ReadZ, true>(); }
+void CPU::I10_BPL() { Branch(!N); }
+void CPU::I50_BVC() { Branch(!V); }
+void CPU::I90_BCC() { Branch(!C); }
+void CPU::ID0_BNE() { Branch(!Z); }
+void CPU::I30_BMI() { Branch(N); }
+void CPU::I70_BVS() { Branch(V); }
+void CPU::IB0_BCS() { Branch(C); }
+void CPU::IF0_BEQ() { Branch(Z); }
 
-void CPU::I18_CLC() { SetFlag<&CPU::SetC, false>(); }
-void CPU::I58_CLI() { SetFlag<&CPU::SetI, false>(); }
-void CPU::IB8_CLV() { SetFlag<&CPU::SetV, false>(); }
-void CPU::ID8_CLD() { SetFlag<&CPU::SetD, false>(); }
-void CPU::I38_SEC() { SetFlag<&CPU::SetC, true>(); }
-void CPU::I78_SEI() { SetFlag<&CPU::SetI, true>(); }
-void CPU::IF8_SED() { SetFlag<&CPU::SetD, true>(); }
+void CPU::I18_CLC() { C = false; }
+void CPU::I58_CLI() { I = false; }
+void CPU::IB8_CLV() { V = false; }
+void CPU::ID8_CLD() { D = false; }
+void CPU::I38_SEC() { C = true; }
+void CPU::I78_SEI() { I = true; }
+void CPU::IF8_SED() { D = true; }
 
-void CPU::I20_JSR() { PushWord(PC + 1); PC = emu.mem.ReadWord(PC); }
-void CPU::I60_RTS() { PC = PopWord() + 1; }
-void CPU::I40_RTI() { P = PopByte() | 0x20; PC = PopWord(); }
+void
+CPU::I00_BRK()
+{
+  uint8_t P = 0x30;
+  P |= C ? 0x01 : 0x00;
+  P |= Z ? 0x02 : 0x00;
+  P |= I ? 0x04 : 0x00;
+  P |= D ? 0x08 : 0x00;
+  P |= V ? 0x40 : 0x00;
+  P |= N ? 0x80 : 0x00;
 
-void CPU::I08_PHP() { PushByte(P | 0x10); }
-void CPU::I28_PLP() { P = (PopByte() & 0xEF) | 0x20; }
-void CPU::I48_PHA() { PushByte(A); }
-void CPU::I68_PLA() { A = PopByte(); Z = A == 0; N = A & 0x80 ? 1 : 0; }
+  PushWord(PC + 1);
+  PushByte(P);
 
-void CPU::I4C_JMP() { PC = emu.mem.ReadWord(PC); }
-void CPU::I6C_JMP()
+  I = 1;
+  PC = emu.mem.ReadWord(0xFFFE);
+}
+
+void
+CPU::I20_JSR()
+{
+  PushWord(PC + 1); PC = emu.mem.ReadWord(PC);
+}
+
+void
+CPU::I60_RTS()
+{
+  PC = PopWord() + 1;
+}
+
+void CPU::I40_RTI()
+{
+  uint8_t P = PopByte();
+  C = P & 0x01 ? 1 : 0;
+  Z = P & 0x02 ? 1 : 0;
+  I = P & 0x04 ? 1 : 0;
+  D = P & 0x08 ? 1 : 0;
+  V = P & 0x40 ? 1 : 0;
+  N = P & 0x80 ? 1 : 0;
+  PC = PopWord();
+}
+
+void
+CPU::I4C_JMP()
+{
+  PC = emu.mem.ReadWord(PC);
+}
+
+void
+CPU::I6C_JMP()
 {
   uint16_t b0, b1;
   b0 = emu.mem.ReadWord(PC);
   b1 = (b0 & 0xFF00) | ((b0 + 1) & 0xFF);
   PC = emu.mem.ReadByte(b0) | (emu.mem.ReadByte(b1) << 8);
+}
+
+// -----------------------------------------------------------------------------
+// Stack
+// -----------------------------------------------------------------------------
+void
+CPU::I08_PHP()
+{
+  uint8_t P = 0x30;
+  P |= C ? 0x01 : 0x00;
+  P |= Z ? 0x02 : 0x00;
+  P |= I ? 0x04 : 0x00;
+  P |= D ? 0x08 : 0x00;
+  P |= V ? 0x40 : 0x00;
+  P |= N ? 0x80 : 0x00;
+  PushByte(P);
+}
+
+void
+CPU::I28_PLP()
+{
+  uint8_t P = PopByte();
+  C = P & 0x01 ? 1 : 0;
+  Z = P & 0x02 ? 1 : 0;
+  I = P & 0x04 ? 1 : 0;
+  D = P & 0x08 ? 1 : 0;
+  V = P & 0x40 ? 1 : 0;
+  N = P & 0x80 ? 1 : 0;
+}
+
+void
+CPU::I48_PHA()
+{
+  PushByte(A);
+}
+
+void
+CPU::I68_PLA()
+{
+  A = PopByte();
+  Z = A == 0;
+  N = A & 0x80 ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -455,111 +552,196 @@ void CPU::IBA_TSX() { Move<&CPU::ReadS, &CPU::WriteX>(); }
 // -----------------------------------------------------------------------------
 // Undocumented instructions
 // -----------------------------------------------------------------------------
-void CPU::I02_KIL() { std::cout << "I02_KIL" << std::endl; exit(0); }
-void CPU::I03_SLO() { std::cout << "I03_SLO" << std::endl; exit(0); }
-void CPU::I04_DOP() { PC++; }
-void CPU::I07_SLO() { std::cout << "I07_SLO" << std::endl; exit(0); }
-void CPU::I0B_AAC() { std::cout << "I0B_AAC" << std::endl; exit(0); }
-void CPU::I0C_TOP() { PC += 2; }
-void CPU::I0F_SLO() { std::cout << "I0F_SLO" << std::endl; exit(0); }
-void CPU::I12_KIL() { std::cout << "I12_KIL" << std::endl; exit(0); }
-void CPU::I13_SLO() { std::cout << "I13_SLO" << std::endl; exit(0); }
-void CPU::I14_DOP() { PC++; }
-void CPU::I17_SLO() { std::cout << "I17_SLO" << std::endl; exit(0); }
+void CPU::IE7_ISC() { ISC<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
+void CPU::IF7_ISC() { ISC<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
+void CPU::IEF_ISC() { ISC<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
+void CPU::IFF_ISC() { ISC<&CPU::ReadAbsoluteX,        &CPU::WriteAbsoluteX>(); }
+void CPU::IFB_ISC() { ISC<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
+void CPU::IE3_ISC() { ISC<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
+void CPU::IF3_ISC() { ISC<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
+
+void CPU::IC7_DCP() { DCP<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
+void CPU::ID7_DCP() { DCP<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
+void CPU::ICF_DCP() { DCP<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
+void CPU::IDF_DCP() { DCP<&CPU::ReadAbsoluteX,        &CPU::WriteAbsoluteX>(); }
+void CPU::IDB_DCP() { DCP<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
+void CPU::IC3_DCP() { DCP<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
+void CPU::ID3_DCP() { DCP<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
+
+void CPU::I07_SLO() { SLO<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
+void CPU::I17_SLO() { SLO<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
+void CPU::I0F_SLO() { SLO<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
+void CPU::I1F_SLO() { SLO<&CPU::ReadAbsoluteX,        &CPU::WriteAbsoluteX>(); }
+void CPU::I1B_SLO() { SLO<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
+void CPU::I03_SLO() { SLO<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
+void CPU::I13_SLO() { SLO<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
+
+void CPU::I27_RLA() { RLA<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
+void CPU::I37_RLA() { RLA<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
+void CPU::I2F_RLA() { RLA<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
+void CPU::I3F_RLA() { RLA<&CPU::ReadAbsoluteX,        &CPU::WriteAbsoluteX>(); }
+void CPU::I3B_RLA() { RLA<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
+void CPU::I23_RLA() { RLA<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
+void CPU::I33_RLA() { RLA<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
+
+void CPU::I47_SRE() { SRE<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
+void CPU::I57_SRE() { SRE<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
+void CPU::I4F_SRE() { SRE<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
+void CPU::I5F_SRE() { SRE<&CPU::ReadAbsoluteX,        &CPU::WriteAbsoluteX>(); }
+void CPU::I5B_SRE() { SRE<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
+void CPU::I43_SRE() { SRE<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
+void CPU::I53_SRE() { SRE<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
+
+void CPU::I67_RRA() { RRA<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
+void CPU::I77_RRA() { RRA<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
+void CPU::I6F_RRA() { RRA<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
+void CPU::I7F_RRA() { RRA<&CPU::ReadAbsoluteX,        &CPU::WriteAbsoluteX>(); }
+void CPU::I7B_RRA() { RRA<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
+void CPU::I63_RRA() { RRA<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
+void CPU::I73_RRA() { RRA<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
+
+void CPU::IA7_LAX() { LAX<&CPU::ReadZeroPage>(); }
+void CPU::IB7_LAX() { LAX<&CPU::ReadZeroPageY>(); }
+void CPU::IAF_LAX() { LAX<&CPU::ReadAbsolute>(); }
+void CPU::IBF_LAX() { LAX<&CPU::ReadAbsoluteY>(); }
+void CPU::IA3_LAX() { LAX<&CPU::ReadIndexedIndirectX>(); }
+void CPU::IB3_LAX() { LAX<&CPU::ReadIndirectIndexedY>(); }
+
+void CPU::I87_AAX() { AAX<&CPU::WriteZeroPage>(); }
+void CPU::I97_AAX() { AAX<&CPU::WriteZeroPageY>(); }
+void CPU::I83_AAX() { AAX<&CPU::WriteIndexedIndirectX>(); }
+void CPU::I8F_AAX() { AAX<&CPU::WriteAbsolute>(); }
+
+void CPU::I93_AXA() { AXA<&CPU::WriteIndirectIndexedY>(); }
+void CPU::I9F_AXA() { AXA<&CPU::WriteAbsoluteY>(); }
+
 void CPU::I1A_NOP() { }
-void CPU::I1B_SLO() { std::cout << "I1B_SLO" << std::endl; exit(0); }
-void CPU::I1C_TOP() { PC += 2; }
-void CPU::I1F_SLO() { std::cout << "I1F_SLO" << std::endl; exit(0); }
-void CPU::I22_KIL() { std::cout << "I22_KIL" << std::endl; exit(0); }
-void CPU::I23_RLA() { std::cout << "I23_RLA" << std::endl; exit(0); }
-void CPU::I27_RLA() { std::cout << "I27_RLA" << std::endl; exit(0); }
-void CPU::I2B_AAC() { std::cout << "I2B_AAC" << std::endl; exit(0); }
-void CPU::I2F_RLA() { std::cout << "I2F_RLA" << std::endl; exit(0); }
-void CPU::I32_KIL() { std::cout << "I32_KIL" << std::endl; exit(0); }
-void CPU::I33_RLA() { std::cout << "I33_RLA" << std::endl; exit(0); }
-void CPU::I34_DOP() { PC++; }
-void CPU::I37_RLA() { std::cout << "I37_RLA" << std::endl; exit(0); }
 void CPU::I3A_NOP() { }
-void CPU::I3B_RLA() { std::cout << "I3B_RLA" << std::endl; exit(0); }
-void CPU::I3C_TOP() { PC += 2; }
-void CPU::I3F_RLA() { std::cout << "I3F_RLA" << std::endl; exit(0); }
-void CPU::I42_KIL() { std::cout << "I42_KIL" << std::endl; exit(0); }
-void CPU::I43_SRE() { std::cout << "I43_SRE" << std::endl; exit(0); }
-void CPU::I44_DOP() { PC++; }
-void CPU::I47_SRE() { std::cout << "I47_SRE" << std::endl; exit(0); }
-void CPU::I4B_ASR() { std::cout << "I4B_ASR" << std::endl; exit(0); }
-void CPU::I4F_SRE() { std::cout << "I4F_SRE" << std::endl; exit(0); }
-void CPU::I52_KIL() { std::cout << "I52_KIL" << std::endl; exit(0); }
-void CPU::I53_SRE() { std::cout << "I53_SRE" << std::endl; exit(0); }
-void CPU::I54_DOP() { PC++; }
-void CPU::I57_SRE() { std::cout << "I57_SRE" << std::endl; exit(0); }
 void CPU::I5A_NOP() { }
-void CPU::I5B_SRE() { std::cout << "I5B_SRE" << std::endl; exit(0); }
-void CPU::I5C_TOP() { PC += 2; }
-void CPU::I5F_SRE() { std::cout << "I5F_SRE" << std::endl; exit(0); }
-void CPU::I62_KIL() { std::cout << "I62_KIL" << std::endl; exit(0); }
-void CPU::I63_RRA() { std::cout << "I63_RRA" << std::endl; exit(0); }
-void CPU::I64_DOP() { PC++; }
-void CPU::I67_RRA() { std::cout << "I67_RRA" << std::endl; exit(0); }
-void CPU::I6B_ARR() { std::cout << "I6B_ARR" << std::endl; exit(0); }
-void CPU::I6F_RRA() { std::cout << "I6F_RRA" << std::endl; exit(0); }
-void CPU::I72_KIL() { std::cout << "I72_KIL" << std::endl; exit(0); }
-void CPU::I73_RRA() { std::cout << "I73_RRA" << std::endl; exit(0); }
-void CPU::I74_DOP() { PC++; }
-void CPU::I77_RRA() { std::cout << "I77_RRA" << std::endl; exit(0); }
 void CPU::I7A_NOP() { }
-void CPU::I7B_RRA() { std::cout << "I7B_RRA" << std::endl; exit(0); }
-void CPU::I7C_TOP() { PC += 2; }
-void CPU::I7F_RRA() { std::cout << "I7F_RRA" << std::endl; exit(0); }
+void CPU::IDA_NOP() { }
+void CPU::IFA_NOP() { }
+
+void CPU::I14_DOP() { PC++; }
+void CPU::I04_DOP() { PC++; }
+void CPU::I34_DOP() { PC++; }
+void CPU::I44_DOP() { PC++; }
+void CPU::I54_DOP() { PC++; }
+void CPU::I64_DOP() { PC++; }
+void CPU::I74_DOP() { PC++; }
 void CPU::I80_DOP() { PC++; }
 void CPU::I82_DOP() { PC++; }
-void CPU::I83_AAX() { std::cout << "I83_AAX" << std::endl; exit(0); }
-void CPU::I87_AAX() { std::cout << "I87_AAX" << std::endl; exit(0); }
 void CPU::I89_DOP() { PC++; }
-void CPU::I8B_XAA() { std::cout << "I8B_XAA" << std::endl; exit(0); }
-void CPU::I8F_AAX() { std::cout << "I8F_AAX" << std::endl; exit(0); }
-void CPU::I92_KIL() { std::cout << "I92_KIL" << std::endl; exit(0); }
-void CPU::I93_AXA() { std::cout << "I93_AXA" << std::endl; exit(0); }
-void CPU::I97_AAX() { std::cout << "I97_AAX" << std::endl; exit(0); }
-void CPU::I9B_XAS() { std::cout << "I9B_XAS" << std::endl; exit(0); }
-void CPU::I9C_SYA() { std::cout << "I9C_SYA" << std::endl; exit(0); }
-void CPU::I9E_SXA() { std::cout << "I9E_SXA" << std::endl; exit(0); }
-void CPU::I9F_AXA() { std::cout << "I9F_AXA" << std::endl; exit(0); }
-void CPU::IA3_LAX() { std::cout << "IA3_LAX" << std::endl; exit(0); }
-void CPU::IA7_LAX() { std::cout << "IA7_LAX" << std::endl; exit(0); }
-void CPU::IAB_ATX() { std::cout << "IAB_ATX" << std::endl; exit(0); }
-void CPU::IAF_LAX() { std::cout << "IAF_LAX" << std::endl; exit(0); }
-void CPU::IB2_KIL() { std::cout << "IB2_KIL" << std::endl; exit(0); }
-void CPU::IB3_LAX() { std::cout << "IB3_LAX" << std::endl; exit(0); }
-void CPU::IB7_LAX() { std::cout << "IB7_LAX" << std::endl; exit(0); }
-void CPU::IBB_LAR() { std::cout << "IBB_LAR" << std::endl; exit(0); }
-void CPU::IBF_LAX() { std::cout << "IBF_LAX" << std::endl; exit(0); }
 void CPU::IC2_DOP() { PC++; }
-void CPU::IC3_DCP() { std::cout << "IC3_DCP" << std::endl; exit(0); }
-void CPU::IC7_DCP() { std::cout << "IC7_DCP" << std::endl; exit(0); }
-void CPU::ICB_AXS() { std::cout << "ICB_AXS" << std::endl; exit(0); }
-void CPU::ICF_DCP() { std::cout << "ICF_DCP" << std::endl; exit(0); }
-void CPU::ID2_KIL() { std::cout << "ID2_KIL" << std::endl; exit(0); }
-void CPU::ID3_DCP() { std::cout << "ID3_DCP" << std::endl; exit(0); }
 void CPU::ID4_DOP() { PC++; }
-void CPU::ID7_DCP() { std::cout << "ID7_DCP" << std::endl; exit(0); }
-void CPU::IDA_NOP() { }
-void CPU::IDB_DCP() { std::cout << "IDB_DCP" << std::endl; exit(0); }
-void CPU::IDC_TOP() { PC += 2; }
-void CPU::IDF_DCP() { std::cout << "IDF_DCP" << std::endl; exit(0); }
 void CPU::IE2_DOP() { PC++; }
-void CPU::IE3_ISC() { std::cout << "IE3_ISC" << std::endl; exit(0); }
-void CPU::IE7_ISC() { std::cout << "IE7_ISC" << std::endl; exit(0); }
-void CPU::IEB_SBC() { std::cout << "IEB_SBC" << std::endl; exit(0); }
-void CPU::IEF_ISC() { std::cout << "IEF_ISC" << std::endl; exit(0); }
-void CPU::IF2_KIL() { std::cout << "IF2_KIL" << std::endl; exit(0); }
-void CPU::IF3_ISC() { std::cout << "IF3_ISC" << std::endl; exit(0); }
 void CPU::IF4_DOP() { PC++; }
-void CPU::IF7_ISC() { std::cout << "IF7_ISC" << std::endl; exit(0); }
-void CPU::IFA_NOP() { }
-void CPU::IFB_ISC() { std::cout << "IFB_ISC" << std::endl; exit(0); }
+
+void CPU::I0C_TOP() { PC += 2; }
+void CPU::I1C_TOP() { PC += 2; }
+void CPU::I3C_TOP() { PC += 2; }
+void CPU::I5C_TOP() { PC += 2; }
+void CPU::I7C_TOP() { PC += 2; }
+void CPU::IDC_TOP() { PC += 2; }
 void CPU::IFC_TOP() { PC += 2; }
-void CPU::IFF_ISC() { std::cout << "IFF_ISC" << std::endl; exit(0); }
+
+void CPU::I02_KIL() { std::cout << "I02_KIL" << std::endl; exit(0); }
+void CPU::I12_KIL() { std::cout << "I12_KIL" << std::endl; exit(0); }
+void CPU::I22_KIL() { std::cout << "I22_KIL" << std::endl; exit(0); }
+void CPU::I32_KIL() { std::cout << "I32_KIL" << std::endl; exit(0); }
+void CPU::I42_KIL() { std::cout << "I42_KIL" << std::endl; exit(0); }
+void CPU::I52_KIL() { std::cout << "I52_KIL" << std::endl; exit(0); }
+void CPU::I62_KIL() { std::cout << "I62_KIL" << std::endl; exit(0); }
+void CPU::I72_KIL() { std::cout << "I72_KIL" << std::endl; exit(0); }
+void CPU::I92_KIL() { std::cout << "I92_KIL" << std::endl; exit(0); }
+void CPU::IB2_KIL() { std::cout << "IB2_KIL" << std::endl; exit(0); }
+void CPU::ID2_KIL() { std::cout << "ID2_KIL" << std::endl; exit(0); }
+void CPU::IF2_KIL() { std::cout << "IF2_KIL" << std::endl; exit(0); }
+
+// -----------------------------------------------------------------------------
+// Unimplemented
+// -----------------------------------------------------------------------------
+void
+CPU::I0B_AAC()
+{
+  A = A & ReadImmediate();
+  Z = A == 0;
+  N = C = A & 0x80 ? 1 : 0;
+}
+
+void
+CPU::I2B_AAC()
+{
+  A = A & ReadImmediate();
+  Z = A == 0;
+  N = C = A & 0x80 ? 1 : 0;
+}
+
+void
+CPU::I4B_ASR()
+{
+  A = A & ReadImmediate();
+  C = A & 0x01;
+  A >>= 1;
+  Z = A == 0;
+  N = 0;
+}
+
+void
+CPU::I6B_ARR()
+{
+  ++PC;
+}
+
+void
+CPU::IAB_ATX()
+{
+  X = A = (A | 0xEE) & ReadImmediate();
+  Z = X == 0;
+  N = X & 0x80 ? 1 : 0;
+}
+
+void
+CPU::ICB_AXS()
+{
+  ++PC;
+}
+
+void
+CPU::I9C_SYA()
+{
+  uint16_t arg;
+  uint8_t M;
+  bool c;
+
+  arg = emu.mem.ReadWord(PC), PC += 2;
+  M = Y & (((arg & 0xFF00) >> 8) + 1);
+  emu.mem.WriteByte(arg + X, M);
+}
+
+void
+CPU::I9E_SXA()
+{
+  PC += 2;
+}
+
+void
+CPU::I8B_XAA()
+{
+  std::cout << "I8B_XAA" << std::endl; exit(0);
+}
+
+void
+CPU::I9B_XAS()
+{
+  std::cout << "I9B_XAS" << std::endl; exit(0);
+}
+
+void
+CPU::IBB_LAR()
+{
+  std::cout << "IBB_LAR" << std::endl; exit(0);
+}
 
 // -----------------------------------------------------------------------------
 // Dispatch table

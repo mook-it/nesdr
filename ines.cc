@@ -83,7 +83,7 @@ INes::Read()
 }
 
 void
-INes::Dump(std::ostream& os)
+INes::Dump(std::ostream& os) const
 {
   os << "Version:      " << (version == INES1 ? "iNES 2.0" : "iNES") << "\n";
   os << "PRG ROM size: " << (prgROMData.size() >> 10) << "Kb \n";

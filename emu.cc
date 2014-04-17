@@ -7,16 +7,14 @@ void
 Emulator::Init(const std::string& file)
 {
   mem.LoadINes(file);
-  //mem.LoadBank(0, Memory::LROM);
-  //mem.LoadBank(1, Memory::HROM);
-  mem.LoadBank(0, Memory::HROM);
+  //mem.LoadBank(0, Memory::HROM);
   cpu.Start();
 }
 
 void
 Emulator::Run()
 {
-  for (int i = 0; i < 8000; ++i)
+  while (1)
   {
     cpu.Tick();
   }

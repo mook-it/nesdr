@@ -25,6 +25,7 @@ class Emulator;
 #include "ines.h"
 #include "cpu.h"
 #include "mem.h"
+#include "mmc.h"
 #include "apu.h"
 #include "ppu.h"
 

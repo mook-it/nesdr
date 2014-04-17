@@ -15,6 +15,36 @@ class Memory
 {
 public:
   /**
+   * MMC mapper interface
+   */
+  class Mapper
+  {
+  public:
+    /**
+     * Creates a new mapper which has access to the memory system
+     * @parame mem Memory subsystem
+     */
+    Mapper(Memory &mem, INes& cart)
+      : mem(mem)
+      , cart(cart)
+    {
+    }
+
+    /**
+     * Writes a value to a control register
+     * @param addr 16 bit address in range 0x8000 - 0xFFFF
+     * @param value Argument
+     */
+    virtual void Write(uint16_t addr, uint8_t value) = 0;
+
+  protected:
+    /// Reference to the memory system
+    Memory &mem;
+    /// Reference to the iNES file
+    INes &cart;
+  };
+
+  /**
    * The two ROM areas
    */
   enum ROMArea
@@ -174,6 +204,9 @@ private:
 
   /// Cartridge file
   std::unique_ptr<INes> cart;
+
+  /// Memory mapper
+  std::unique_ptr<Mapper> mapper;
 
   /// Reference to the emulator
   Emulator &emu;
