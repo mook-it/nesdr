@@ -94,7 +94,16 @@ public:
    */
   uint16_t ReadWord(uint16_t addr)
   {
-    return ReadByte(addr) | (ReadByte(addr + 1) << 8);
+    uint8_t low = ReadByte(addr);
+    uint8_t high = ReadByte(addr + 1);
+
+    __asm__( "movb %1, %%al; movb %2, %%ah"
+           : "=a" (addr)
+           : "r" (low), "r" (high)
+           : "%ax"
+           );
+
+    return addr;
   }
 
   /**

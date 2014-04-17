@@ -4,10 +4,7 @@
 #include "emu.h"
 
 // -----------------------------------------------------------------------------
-// Core
-// -----------------------------------------------------------------------------
-void
-CPU::Start()
+void CPU::Start()
 {
   PC = emu.mem.ReadWord(0xFFFC);
   S = 0xFD;
@@ -19,8 +16,8 @@ CPU::Start()
   N = 0;
 }
 
-void
-CPU::Tick()
+// -----------------------------------------------------------------------------
+void CPU::Tick()
 {
   uint8_t op;
 
@@ -51,24 +48,21 @@ CPU::Tick()
 }
 
 // -----------------------------------------------------------------------------
-// Stack
-// -----------------------------------------------------------------------------
-inline void
-CPU::PushWord(uint16_t word)
+inline void CPU::PushWord(uint16_t word)
 {
   emu.mem.WriteByte((0x100 | ((S - 0) & 0xFF)), (word & 0xFF00) >> 8);
   emu.mem.WriteByte((0x100 | ((S - 1) & 0xFF)), (word & 0x00FF) >> 0);
   S -= 2;
 }
 
-inline void
-CPU::PushByte(uint8_t byte)
+// -----------------------------------------------------------------------------
+inline void CPU::PushByte(uint8_t byte)
 {
   emu.mem.WriteByte((0x100 | S--), byte);
 }
 
-inline uint16_t
-CPU::PopWord()
+// -----------------------------------------------------------------------------
+inline uint16_t CPU::PopWord()
 {
   uint16_t word;
 
@@ -78,103 +72,100 @@ CPU::PopWord()
   return word;
 }
 
-inline uint8_t
-CPU::PopByte()
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::PopByte()
 {
   return emu.mem.ReadByte(0x100 | ++S);
 }
 
 // -----------------------------------------------------------------------------
-// Memory Read
-// -----------------------------------------------------------------------------
-inline uint8_t
-CPU::ReadImmediate()
+inline uint8_t CPU::ReadImmediate()
 {
   return emu.mem.ReadByte(PC++);
 }
 
-inline uint8_t
-CPU::ReadImmediate(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadImmediate(uint16_t &addr, bool &c)
 {
   c = true;
   addr = 0;
   return emu.mem.ReadByte(PC++);
 }
 
-inline uint8_t
-CPU::ReadZeroPage(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadZeroPage(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadByte(PC++);
   return emu.mem.ReadByteZeroPage(addr);
 }
 
-inline uint8_t
-CPU::ReadZeroPageX(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadZeroPageX(uint16_t &addr, bool &c)
 {
   c = true;
   addr = (emu.mem.ReadByte(PC++) + X) & 0xFF;
   return emu.mem.ReadByteZeroPage(addr);
 }
 
-inline uint8_t
-CPU::ReadZeroPageY(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadZeroPageY(uint16_t &addr, bool &c)
 {
   c = true;
   addr = (emu.mem.ReadByte(PC++) + Y) & 0xFF;
   return emu.mem.ReadByteZeroPage(addr);
 }
 
-inline uint8_t
-CPU::ReadAbsolute(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadAbsolute(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadWord(PC), PC += 2;
   return emu.mem.ReadByte(addr);
 }
 
-inline uint8_t
-CPU::ReadAbsoluteX(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadAbsoluteX(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadWord(PC) + X, PC += 2;
   return emu.mem.ReadByte(addr);
 }
 
-inline uint8_t
-CPU::ReadAbsoluteY(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadAbsoluteY(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadWord(PC) + Y, PC += 2;
   return emu.mem.ReadByte(addr);
 }
 
-inline uint8_t
-CPU::ReadIndexedIndirectX(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadIndexedIndirectX(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
   return emu.mem.ReadByte(addr);
 }
 
-inline uint8_t
-CPU::ReadIndexedIndirectY(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadIndexedIndirectY(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
   return emu.mem.ReadByte(addr);
 }
 
-inline uint8_t
-CPU::ReadIndirectIndexedX(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadIndirectIndexedX(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
   return emu.mem.ReadByte(addr);
 }
 
-inline uint8_t
-CPU::ReadIndirectIndexedY(uint16_t &addr, bool &c)
+// -----------------------------------------------------------------------------
+inline uint8_t CPU::ReadIndirectIndexedY(uint16_t &addr, bool &c)
 {
   c = true;
   addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
@@ -182,10 +173,7 @@ CPU::ReadIndirectIndexedY(uint16_t &addr, bool &c)
 }
 
 // -----------------------------------------------------------------------------
-// Memory Write
-// -----------------------------------------------------------------------------
-inline void
-CPU::WriteAbsolute(uint16_t addr, bool c, uint8_t v)
+inline void CPU::WriteAbsolute(uint16_t addr, bool c, uint8_t v)
 {
   if (!c)
   {
@@ -196,8 +184,8 @@ CPU::WriteAbsolute(uint16_t addr, bool c, uint8_t v)
   emu.mem.WriteByte(addr, v);
 }
 
-inline void
-CPU::WriteAbsoluteX(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteAbsoluteX(uint16_t addr, bool c, uint8_t v)
 {
   if (!c)
   {
@@ -207,8 +195,8 @@ CPU::WriteAbsoluteX(uint16_t addr, bool c, uint8_t v)
   emu.mem.WriteByte(addr, v);
 }
 
-inline void
-CPU::WriteAbsoluteY(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteAbsoluteY(uint16_t addr, bool c, uint8_t v)
 {
   if (!c)
   {
@@ -218,26 +206,26 @@ CPU::WriteAbsoluteY(uint16_t addr, bool c, uint8_t v)
   emu.mem.WriteByte(addr, v);
 }
 
-inline void
-CPU::WriteZeroPage(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteZeroPage(uint16_t addr, bool c, uint8_t v)
 {
   emu.mem.WriteByte(c ? addr : addr = emu.mem.ReadByte(PC++), v);
 }
 
-inline void
-CPU::WriteZeroPageX(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteZeroPageX(uint16_t addr, bool c, uint8_t v)
 {
   emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + X) & 0xFF, v);
 }
 
-inline void
-CPU::WriteZeroPageY(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteZeroPageY(uint16_t addr, bool c, uint8_t v)
 {
   emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + Y) & 0xFF, v);
 }
 
-inline void
-CPU::WriteIndexedIndirectX(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteIndexedIndirectX(uint16_t addr, bool c, uint8_t v)
 {
   if (!c)
   {
@@ -247,8 +235,8 @@ CPU::WriteIndexedIndirectX(uint16_t addr, bool c, uint8_t v)
   emu.mem.WriteByte(addr, v);
 }
 
-inline void
-CPU::WriteIndexedIndirectY(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteIndexedIndirectY(uint16_t addr, bool c, uint8_t v)
 {
   if (!c)
   {
@@ -258,8 +246,8 @@ CPU::WriteIndexedIndirectY(uint16_t addr, bool c, uint8_t v)
   emu.mem.WriteByte(addr, v);
 }
 
-inline void
-CPU::WriteIndirectIndexedX(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteIndirectIndexedX(uint16_t addr, bool c, uint8_t v)
 {
   if (!c)
   {
@@ -269,8 +257,8 @@ CPU::WriteIndirectIndexedX(uint16_t addr, bool c, uint8_t v)
   emu.mem.WriteByte(addr, v);
 }
 
-inline void
-CPU::WriteIndirectIndexedY(uint16_t addr, bool c, uint8_t v)
+// -----------------------------------------------------------------------------
+inline void CPU::WriteIndirectIndexedY(uint16_t addr, bool c, uint8_t v)
 {
   if (!c)
   {
@@ -281,8 +269,6 @@ CPU::WriteIndirectIndexedY(uint16_t addr, bool c, uint8_t v)
 }
 
 // -----------------------------------------------------------------------------
-// Arithmetical & Logical Instructions
-// -----------------------------------------------------------------------------
 void CPU::I09_ORA() { Bitwise<bit_or<uint8_t>,  &CPU::ReadImmediate>(); }
 void CPU::I05_ORA() { Bitwise<bit_or<uint8_t>,  &CPU::ReadZeroPage>(); }
 void CPU::I15_ORA() { Bitwise<bit_or<uint8_t>,  &CPU::ReadZeroPageX>(); }
@@ -292,6 +278,7 @@ void CPU::I19_ORA() { Bitwise<bit_or<uint8_t>,  &CPU::ReadAbsoluteY>(); }
 void CPU::I01_ORA() { Bitwise<bit_or<uint8_t>,  &CPU::ReadIndexedIndirectX>(); }
 void CPU::I11_ORA() { Bitwise<bit_or<uint8_t>,  &CPU::ReadIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I29_AND() { Bitwise<bit_and<uint8_t>, &CPU::ReadImmediate>(); }
 void CPU::I25_AND() { Bitwise<bit_and<uint8_t>, &CPU::ReadZeroPage>(); }
 void CPU::I35_AND() { Bitwise<bit_and<uint8_t>, &CPU::ReadZeroPageX>(); }
@@ -301,6 +288,7 @@ void CPU::I39_AND() { Bitwise<bit_and<uint8_t>, &CPU::ReadAbsoluteY>(); }
 void CPU::I21_AND() { Bitwise<bit_and<uint8_t>, &CPU::ReadIndexedIndirectX>(); }
 void CPU::I31_AND() { Bitwise<bit_and<uint8_t>, &CPU::ReadIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I49_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadImmediate>(); }
 void CPU::I45_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadZeroPage>(); }
 void CPU::I55_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadZeroPageX>(); }
@@ -310,30 +298,35 @@ void CPU::I59_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadAbsoluteY>(); }
 void CPU::I41_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadIndexedIndirectX>(); }
 void CPU::I51_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I0A_ASL() { ASL<&CPU::ReadA,         &CPU::WriteA>(); }
 void CPU::I06_ASL() { ASL<&CPU::ReadZeroPage,  &CPU::WriteZeroPage>(); }
 void CPU::I16_ASL() { ASL<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX>(); }
 void CPU::I0E_ASL() { ASL<&CPU::ReadAbsolute,  &CPU::WriteAbsolute>(); }
 void CPU::I1E_ASL() { ASL<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I4A_LSR() { LSR<&CPU::ReadA,         &CPU::WriteA>(); }
 void CPU::I46_LSR() { LSR<&CPU::ReadZeroPage,  &CPU::WriteZeroPage>(); }
 void CPU::I56_LSR() { LSR<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX>(); }
 void CPU::I4E_LSR() { LSR<&CPU::ReadAbsolute,  &CPU::WriteAbsolute>(); }
 void CPU::I5E_LSR() { LSR<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I2A_ROL() { ROL<&CPU::ReadA,         &CPU::WriteA>(); }
 void CPU::I26_ROL() { ROL<&CPU::ReadZeroPage,  &CPU::WriteZeroPage>(); }
 void CPU::I36_ROL() { ROL<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX>(); }
 void CPU::I2E_ROL() { ROL<&CPU::ReadAbsolute,  &CPU::WriteAbsolute>(); }
 void CPU::I3E_ROL() { ROL<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I6A_ROR() { ROR<&CPU::ReadA,         &CPU::WriteA>(); }
 void CPU::I66_ROR() { ROR<&CPU::ReadZeroPage,  &CPU::WriteZeroPage>(); }
 void CPU::I76_ROR() { ROR<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX>(); }
 void CPU::I6E_ROR() { ROR<&CPU::ReadAbsolute,  &CPU::WriteAbsolute>(); }
 void CPU::I7E_ROR() { ROR<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I69_ADC() { ADC<&CPU::ReadImmediate>(); }
 void CPU::I65_ADC() { ADC<&CPU::ReadZeroPage>(); }
 void CPU::I75_ADC() { ADC<&CPU::ReadZeroPageX>(); }
@@ -343,6 +336,7 @@ void CPU::I79_ADC() { ADC<&CPU::ReadAbsoluteY>(); }
 void CPU::I61_ADC() { ADC<&CPU::ReadIndexedIndirectX>(); }
 void CPU::I71_ADC() { ADC<&CPU::ReadIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::IE9_SBC() { SBC<&CPU::ReadImmediate>(); }
 void CPU::IEB_SBC() { SBC<&CPU::ReadImmediate>(); }
 void CPU::IE5_SBC() { SBC<&CPU::ReadZeroPage>(); }
@@ -353,6 +347,7 @@ void CPU::IF9_SBC() { SBC<&CPU::ReadAbsoluteY>(); }
 void CPU::IE1_SBC() { SBC<&CPU::ReadIndexedIndirectX>(); }
 void CPU::IF1_SBC() { SBC<&CPU::ReadIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::ICA_DEX() { IncDec<&CPU::ReadX,         &CPU::WriteX,         -1>(); }
 void CPU::I88_DEY() { IncDec<&CPU::ReadY,         &CPU::WriteY,         -1>(); }
 void CPU::IC6_DEC() { IncDec<&CPU::ReadZeroPage,  &CPU::WriteZeroPage,  -1>(); }
@@ -360,6 +355,7 @@ void CPU::ID6_DEC() { IncDec<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX, -1>(); }
 void CPU::ICE_DEC() { IncDec<&CPU::ReadAbsolute,  &CPU::WriteAbsolute,  -1>(); }
 void CPU::IDE_DEC() { IncDec<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX, -1>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::IE8_INX() { IncDec<&CPU::ReadX,         &CPU::WriteX,          1>(); }
 void CPU::IC8_INY() { IncDec<&CPU::ReadY,         &CPU::WriteY,          1>(); }
 void CPU::IE6_INC() { IncDec<&CPU::ReadZeroPage,  &CPU::WriteZeroPage,   1>(); }
@@ -367,6 +363,7 @@ void CPU::IF6_INC() { IncDec<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX,  1>(); }
 void CPU::IEE_INC() { IncDec<&CPU::ReadAbsolute,  &CPU::WriteAbsolute,   1>(); }
 void CPU::IFE_INC() { IncDec<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX,  1>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::IC9_CMP() { CMP<&CPU::ReadA, &CPU::ReadImmediate>(); }
 void CPU::IC5_CMP() { CMP<&CPU::ReadA, &CPU::ReadZeroPage>(); }
 void CPU::ID5_CMP() { CMP<&CPU::ReadA, &CPU::ReadZeroPageX>(); }
@@ -382,14 +379,14 @@ void CPU::IE0_CPX() { CMP<&CPU::ReadX, &CPU::ReadImmediate>(); }
 void CPU::IE4_CPX() { CMP<&CPU::ReadX, &CPU::ReadZeroPage>(); }
 void CPU::IEC_CPX() { CMP<&CPU::ReadX, &CPU::ReadAbsolute>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I24_BIT() { BIT<&CPU::ReadZeroPage>(); }
 void CPU::I2C_BIT() { BIT<&CPU::ReadAbsolute>(); }
 
 // -----------------------------------------------------------------------------
-// Control Flow
-// -----------------------------------------------------------------------------
 void CPU::IEA_NOP() { }
 
+// -----------------------------------------------------------------------------
 void CPU::I10_BPL() { Branch(!N); }
 void CPU::I50_BVC() { Branch(!V); }
 void CPU::I90_BCC() { Branch(!C); }
@@ -399,6 +396,7 @@ void CPU::I70_BVS() { Branch(V); }
 void CPU::IB0_BCS() { Branch(C); }
 void CPU::IF0_BEQ() { Branch(Z); }
 
+// -----------------------------------------------------------------------------
 void CPU::I18_CLC() { C = false; }
 void CPU::I58_CLI() { I = false; }
 void CPU::IB8_CLV() { V = false; }
@@ -407,107 +405,6 @@ void CPU::I38_SEC() { C = true; }
 void CPU::I78_SEI() { I = true; }
 void CPU::IF8_SED() { D = true; }
 
-void
-CPU::I00_BRK()
-{
-  uint8_t P = 0x30;
-  P |= C ? 0x01 : 0x00;
-  P |= Z ? 0x02 : 0x00;
-  P |= I ? 0x04 : 0x00;
-  P |= D ? 0x08 : 0x00;
-  P |= V ? 0x40 : 0x00;
-  P |= N ? 0x80 : 0x00;
-
-  PushWord(PC + 1);
-  PushByte(P);
-
-  I = 1;
-  PC = emu.mem.ReadWord(0xFFFE);
-}
-
-void
-CPU::I20_JSR()
-{
-  PushWord(PC + 1); PC = emu.mem.ReadWord(PC);
-}
-
-void
-CPU::I60_RTS()
-{
-  PC = PopWord() + 1;
-}
-
-void CPU::I40_RTI()
-{
-  uint8_t P = PopByte();
-  C = P & 0x01 ? 1 : 0;
-  Z = P & 0x02 ? 1 : 0;
-  I = P & 0x04 ? 1 : 0;
-  D = P & 0x08 ? 1 : 0;
-  V = P & 0x40 ? 1 : 0;
-  N = P & 0x80 ? 1 : 0;
-  PC = PopWord();
-}
-
-void
-CPU::I4C_JMP()
-{
-  PC = emu.mem.ReadWord(PC);
-}
-
-void
-CPU::I6C_JMP()
-{
-  uint16_t b0, b1;
-  b0 = emu.mem.ReadWord(PC);
-  b1 = (b0 & 0xFF00) | ((b0 + 1) & 0xFF);
-  PC = emu.mem.ReadByte(b0) | (emu.mem.ReadByte(b1) << 8);
-}
-
-// -----------------------------------------------------------------------------
-// Stack
-// -----------------------------------------------------------------------------
-void
-CPU::I08_PHP()
-{
-  uint8_t P = 0x30;
-  P |= C ? 0x01 : 0x00;
-  P |= Z ? 0x02 : 0x00;
-  P |= I ? 0x04 : 0x00;
-  P |= D ? 0x08 : 0x00;
-  P |= V ? 0x40 : 0x00;
-  P |= N ? 0x80 : 0x00;
-  PushByte(P);
-}
-
-void
-CPU::I28_PLP()
-{
-  uint8_t P = PopByte();
-  C = P & 0x01 ? 1 : 0;
-  Z = P & 0x02 ? 1 : 0;
-  I = P & 0x04 ? 1 : 0;
-  D = P & 0x08 ? 1 : 0;
-  V = P & 0x40 ? 1 : 0;
-  N = P & 0x80 ? 1 : 0;
-}
-
-void
-CPU::I48_PHA()
-{
-  PushByte(A);
-}
-
-void
-CPU::I68_PLA()
-{
-  A = PopByte();
-  Z = A == 0;
-  N = A & 0x80 ? 1 : 0;
-}
-
-// -----------------------------------------------------------------------------
-// Memory Load/Store
 // -----------------------------------------------------------------------------
 void CPU::I81_STA() { Move<&CPU::ReadA, &CPU::WriteIndexedIndirectX, false>(); }
 void CPU::I85_STA() { Move<&CPU::ReadA, &CPU::WriteZeroPage,         false>(); }
@@ -523,6 +420,7 @@ void CPU::I86_STX() { Move<&CPU::ReadX, &CPU::WriteZeroPage,         false>(); }
 void CPU::I8E_STX() { Move<&CPU::ReadX, &CPU::WriteAbsolute,         false>(); }
 void CPU::I96_STX() { Move<&CPU::ReadX, &CPU::WriteZeroPageY,        false>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::IA1_LDA() { Move<&CPU::ReadIndexedIndirectX, &CPU::WriteA>(); }
 void CPU::IA5_LDA() { Move<&CPU::ReadZeroPage,         &CPU::WriteA>(); }
 void CPU::IA9_LDA() { Move<&CPU::ReadImmediate,        &CPU::WriteA>(); }
@@ -542,6 +440,7 @@ void CPU::IAE_LDX() { Move<&CPU::ReadAbsolute,         &CPU::WriteX>(); }
 void CPU::IB6_LDX() { Move<&CPU::ReadZeroPageY,        &CPU::WriteX>(); }
 void CPU::IBE_LDX() { Move<&CPU::ReadAbsoluteY,        &CPU::WriteX>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I8A_TXA() { Move<&CPU::ReadX, &CPU::WriteA>(); }
 void CPU::IAA_TAX() { Move<&CPU::ReadA, &CPU::WriteX>(); }
 void CPU::I98_TYA() { Move<&CPU::ReadY, &CPU::WriteA>(); }
@@ -549,8 +448,6 @@ void CPU::IA8_TAY() { Move<&CPU::ReadA, &CPU::WriteY>(); }
 void CPU::I9A_TXS() { Move<&CPU::ReadX, &CPU::WriteS, false>(); }
 void CPU::IBA_TSX() { Move<&CPU::ReadS, &CPU::WriteX>(); }
 
-// -----------------------------------------------------------------------------
-// Undocumented instructions
 // -----------------------------------------------------------------------------
 void CPU::IE7_ISC() { ISC<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
 void CPU::IF7_ISC() { ISC<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
@@ -560,6 +457,7 @@ void CPU::IFB_ISC() { ISC<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
 void CPU::IE3_ISC() { ISC<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
 void CPU::IF3_ISC() { ISC<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::IC7_DCP() { DCP<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
 void CPU::ID7_DCP() { DCP<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
 void CPU::ICF_DCP() { DCP<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
@@ -568,6 +466,7 @@ void CPU::IDB_DCP() { DCP<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
 void CPU::IC3_DCP() { DCP<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
 void CPU::ID3_DCP() { DCP<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I07_SLO() { SLO<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
 void CPU::I17_SLO() { SLO<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
 void CPU::I0F_SLO() { SLO<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
@@ -576,6 +475,7 @@ void CPU::I1B_SLO() { SLO<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
 void CPU::I03_SLO() { SLO<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
 void CPU::I13_SLO() { SLO<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I27_RLA() { RLA<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
 void CPU::I37_RLA() { RLA<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
 void CPU::I2F_RLA() { RLA<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
@@ -584,6 +484,7 @@ void CPU::I3B_RLA() { RLA<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
 void CPU::I23_RLA() { RLA<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
 void CPU::I33_RLA() { RLA<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I47_SRE() { SRE<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
 void CPU::I57_SRE() { SRE<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
 void CPU::I4F_SRE() { SRE<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
@@ -592,6 +493,7 @@ void CPU::I5B_SRE() { SRE<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
 void CPU::I43_SRE() { SRE<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
 void CPU::I53_SRE() { SRE<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I67_RRA() { RRA<&CPU::ReadZeroPage,         &CPU::WriteZeroPage>(); }
 void CPU::I77_RRA() { RRA<&CPU::ReadZeroPageX,        &CPU::WriteZeroPageX>(); }
 void CPU::I6F_RRA() { RRA<&CPU::ReadAbsolute,         &CPU::WriteAbsolute>(); }
@@ -600,6 +502,7 @@ void CPU::I7B_RRA() { RRA<&CPU::ReadAbsoluteY,        &CPU::WriteAbsoluteY>(); }
 void CPU::I63_RRA() { RRA<&CPU::ReadIndexedIndirectX, &CPU::WriteIndexedIndirectX>(); }
 void CPU::I73_RRA() { RRA<&CPU::ReadIndirectIndexedY, &CPU::WriteIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::IA7_LAX() { LAX<&CPU::ReadZeroPage>(); }
 void CPU::IB7_LAX() { LAX<&CPU::ReadZeroPageY>(); }
 void CPU::IAF_LAX() { LAX<&CPU::ReadAbsolute>(); }
@@ -607,14 +510,17 @@ void CPU::IBF_LAX() { LAX<&CPU::ReadAbsoluteY>(); }
 void CPU::IA3_LAX() { LAX<&CPU::ReadIndexedIndirectX>(); }
 void CPU::IB3_LAX() { LAX<&CPU::ReadIndirectIndexedY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I87_AAX() { AAX<&CPU::WriteZeroPage>(); }
 void CPU::I97_AAX() { AAX<&CPU::WriteZeroPageY>(); }
 void CPU::I83_AAX() { AAX<&CPU::WriteIndexedIndirectX>(); }
 void CPU::I8F_AAX() { AAX<&CPU::WriteAbsolute>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I93_AXA() { AXA<&CPU::WriteIndirectIndexedY>(); }
 void CPU::I9F_AXA() { AXA<&CPU::WriteAbsoluteY>(); }
 
+// -----------------------------------------------------------------------------
 void CPU::I1A_NOP() { }
 void CPU::I3A_NOP() { }
 void CPU::I5A_NOP() { }
@@ -622,6 +528,7 @@ void CPU::I7A_NOP() { }
 void CPU::IDA_NOP() { }
 void CPU::IFA_NOP() { }
 
+// -----------------------------------------------------------------------------
 void CPU::I14_DOP() { PC++; }
 void CPU::I04_DOP() { PC++; }
 void CPU::I34_DOP() { PC++; }
@@ -637,6 +544,7 @@ void CPU::ID4_DOP() { PC++; }
 void CPU::IE2_DOP() { PC++; }
 void CPU::IF4_DOP() { PC++; }
 
+// -----------------------------------------------------------------------------
 void CPU::I0C_TOP() { PC += 2; }
 void CPU::I1C_TOP() { PC += 2; }
 void CPU::I3C_TOP() { PC += 2; }
@@ -645,6 +553,7 @@ void CPU::I7C_TOP() { PC += 2; }
 void CPU::IDC_TOP() { PC += 2; }
 void CPU::IFC_TOP() { PC += 2; }
 
+// -----------------------------------------------------------------------------
 void CPU::I02_KIL() { std::cout << "I02_KIL" << std::endl; exit(0); }
 void CPU::I12_KIL() { std::cout << "I12_KIL" << std::endl; exit(0); }
 void CPU::I22_KIL() { std::cout << "I22_KIL" << std::endl; exit(0); }
@@ -659,26 +568,120 @@ void CPU::ID2_KIL() { std::cout << "ID2_KIL" << std::endl; exit(0); }
 void CPU::IF2_KIL() { std::cout << "IF2_KIL" << std::endl; exit(0); }
 
 // -----------------------------------------------------------------------------
-// Unimplemented
+void CPU::I00_BRK()
+{
+  uint8_t P = 0x30;
+  P |= C ? 0x01 : 0x00;
+  P |= Z ? 0x02 : 0x00;
+  P |= I ? 0x04 : 0x00;
+  P |= D ? 0x08 : 0x00;
+  P |= V ? 0x40 : 0x00;
+  P |= N ? 0x80 : 0x00;
+
+  PushWord(PC + 1);
+  PushByte(P);
+
+  I = 1;
+  PC = emu.mem.ReadWord(0xFFFE);
+}
+
 // -----------------------------------------------------------------------------
-void
-CPU::I0B_AAC()
+void CPU::I20_JSR()
+{
+  PushWord(PC + 1); PC = emu.mem.ReadWord(PC);
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I60_RTS()
+{
+  PC = PopWord() + 1;
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I40_RTI()
+{
+  uint8_t P = PopByte();
+  C = P & 0x01 ? 1 : 0;
+  Z = P & 0x02 ? 1 : 0;
+  I = P & 0x04 ? 1 : 0;
+  D = P & 0x08 ? 1 : 0;
+  V = P & 0x40 ? 1 : 0;
+  N = P & 0x80 ? 1 : 0;
+  PC = PopWord();
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I4C_JMP()
+{
+  PC = emu.mem.ReadWord(PC);
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I6C_JMP()
+{
+  uint16_t b0, b1;
+  b0 = emu.mem.ReadWord(PC);
+  b1 = (b0 & 0xFF00) | ((b0 + 1) & 0xFF);
+  PC = emu.mem.ReadByte(b0) | (emu.mem.ReadByte(b1) << 8);
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I08_PHP()
+{
+  uint8_t P = 0x30;
+  P |= C ? 0x01 : 0x00;
+  P |= Z ? 0x02 : 0x00;
+  P |= I ? 0x04 : 0x00;
+  P |= D ? 0x08 : 0x00;
+  P |= V ? 0x40 : 0x00;
+  P |= N ? 0x80 : 0x00;
+  PushByte(P);
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I28_PLP()
+{
+  uint8_t P = PopByte();
+  C = P & 0x01 ? 1 : 0;
+  Z = P & 0x02 ? 1 : 0;
+  I = P & 0x04 ? 1 : 0;
+  D = P & 0x08 ? 1 : 0;
+  V = P & 0x40 ? 1 : 0;
+  N = P & 0x80 ? 1 : 0;
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I48_PHA()
+{
+  PushByte(A);
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I68_PLA()
+{
+  A = PopByte();
+  Z = A == 0;
+  N = A & 0x80 ? 1 : 0;
+}
+
+// -----------------------------------------------------------------------------
+void CPU::I0B_AAC()
 {
   A = A & ReadImmediate();
   Z = A == 0;
   N = C = A & 0x80 ? 1 : 0;
 }
 
-void
-CPU::I2B_AAC()
+// -----------------------------------------------------------------------------
+void CPU::I2B_AAC()
 {
   A = A & ReadImmediate();
   Z = A == 0;
   N = C = A & 0x80 ? 1 : 0;
 }
 
-void
-CPU::I4B_ASR()
+// -----------------------------------------------------------------------------
+void CPU::I4B_ASR()
 {
   A = A & ReadImmediate();
   C = A & 0x01;
@@ -687,28 +690,28 @@ CPU::I4B_ASR()
   N = 0;
 }
 
-void
-CPU::I6B_ARR()
+// -----------------------------------------------------------------------------
+void CPU::I6B_ARR()
 {
   ++PC;
 }
 
-void
-CPU::IAB_ATX()
+// -----------------------------------------------------------------------------
+void CPU::IAB_ATX()
 {
   X = A = (A | 0xEE) & ReadImmediate();
   Z = X == 0;
   N = X & 0x80 ? 1 : 0;
 }
 
-void
-CPU::ICB_AXS()
+// -----------------------------------------------------------------------------
+void CPU::ICB_AXS()
 {
   ++PC;
 }
 
-void
-CPU::I9C_SYA()
+// -----------------------------------------------------------------------------
+void CPU::I9C_SYA()
 {
   uint16_t arg;
   uint8_t M;
@@ -719,32 +722,30 @@ CPU::I9C_SYA()
   emu.mem.WriteByte(arg + X, M);
 }
 
-void
-CPU::I9E_SXA()
+// -----------------------------------------------------------------------------
+void CPU::I9E_SXA()
 {
   PC += 2;
 }
 
-void
-CPU::I8B_XAA()
+// -----------------------------------------------------------------------------
+void CPU::I8B_XAA()
 {
   std::cout << "I8B_XAA" << std::endl; exit(0);
 }
 
-void
-CPU::I9B_XAS()
+// -----------------------------------------------------------------------------
+void CPU::I9B_XAS()
 {
   std::cout << "I9B_XAS" << std::endl; exit(0);
 }
 
-void
-CPU::IBB_LAR()
+// -----------------------------------------------------------------------------
+void CPU::IBB_LAR()
 {
   std::cout << "IBB_LAR" << std::endl; exit(0);
 }
 
-// -----------------------------------------------------------------------------
-// Dispatch table
 // -----------------------------------------------------------------------------
 #define I(r, c, i) [0x##r##c] = &CPU::I##r##c##_##i,
 CPU::IFunPtr CPU::IFunTable[] =

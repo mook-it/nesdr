@@ -32,51 +32,36 @@ public:
   void Tick();
 
 private:
+  /**
+   * Pointer to a function that can retrieve an argument from the
+   * address encoded in the instruction
+   */
+  typedef uint8_t (CPU::*ReadFunc) (uint16_t &, bool &);
 
   /**
-   * Pushes a word onto the stack and decrements the stack pointer
-   * @param word 16 bit value to be placed onto the stack
+   * Pointer to a function that can stores a result at an address encoded
+   * in the instruction
    */
-  void PushWord(uint16_t word);
-
-  /**
-   * Pushes a byte on the stack, decrementing the stack pointer
-   */
-  void PushByte(uint8_t byte);
-
-  /**
-   * Pops a word from the stack and increments the stack pointer
-   * @returns 16 bit value popped from the stack
-   */
-  uint16_t PopWord();
-
-  /**
-   * Pops a byte from the stack, incrementing the stack pointer
-   */
-  uint8_t PopByte();
-
-private:
+  typedef void (CPU::*WriteFunc) (uint16_t, bool c, uint8_t);
 
   /**
    * Moves data between registers or memory
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool c, uint8_t),
-           bool flags = true>
+  template<ReadFunc read, WriteFunc write, bool flags = true>
   inline void Move()
   {
     uint16_t addr;
     uint8_t M;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
     if (flags)
     {
       Z = M == 0;
       N = M & 0x80 ? 1 : 0;
     }
 
-    (this->*Write)(addr, c, M);
+    (this->*write)(addr, c, M);
   }
 
   /**
@@ -90,7 +75,7 @@ private:
   /**
    * Bitwise or
    */
-  template<typename Op, uint8_t (CPU::*Read)(uint16_t &, bool &)>
+  template<typename Op, ReadFunc read>
   inline void Bitwise()
   {
     uint16_t addr;
@@ -98,7 +83,7 @@ private:
     bool c;
     Op op;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
     A = op(A, M);
     Z = A == 0;
     N = A & 0x80 ? 1 : 0;
@@ -107,14 +92,14 @@ private:
   /**
    * Bit test
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &)>
+  template<ReadFunc read>
   inline void BIT()
   {
     uint16_t addr;
     uint8_t M;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
     Z = (A & M) == 0;
     V = M & 0x40 ? 1 : 0;
     N = M & 0x80 ? 1 : 0;
@@ -123,15 +108,14 @@ private:
   /**
    * Rotate Right
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
+  template<ReadFunc read, WriteFunc write>
   inline void ROR()
   {
     uint8_t M, newCarry;
     uint16_t addr;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
 
     newCarry = M & 0x1;
     M = (C << 7) | (M >> 1);
@@ -139,21 +123,20 @@ private:
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
 
-    (this->*Write)(addr, c, M);
+    (this->*write)(addr, c, M);
   }
 
   /**
    * Rotate Left
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
+  template<ReadFunc read, WriteFunc write>
   inline void ROL()
   {
     uint8_t M, newCarry;
     uint16_t addr;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
 
     newCarry = M & 0x80;
     M = C | (M << 1);
@@ -161,61 +144,226 @@ private:
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
 
-    (this->*Write)(addr, c, M);
+    (this->*write)(addr, c, M);
   }
 
   /**
    * Arithmetic shift left
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
+  template<ReadFunc read, WriteFunc write>
   inline void ASL()
   {
     uint16_t addr;
     uint8_t M;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
 
     C = M & 0x80 ? 1 : 0;
     M <<= 1;
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
 
-    (this->*Write)(addr, c, M);
+    (this->*write)(addr, c, M);
   }
 
   /**
    * Logical shift right
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool c, uint8_t)>
+  template<ReadFunc read, WriteFunc write>
   inline void LSR()
   {
     uint16_t addr;
     uint8_t M;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
 
     C = M & 0x01;
     M >>= 1;
     Z = M == 0;
     N = 0;
 
-    (this->*Write)(addr, c, M);
+    (this->*write)(addr, c, M);
+  }
+
+  /**
+   * Subtract 1 from memory without borrow
+   */
+  template<ReadFunc read, WriteFunc write>
+  inline void DCP()
+  {
+    uint16_t addr;
+    uint8_t M;
+    bool c;
+
+    M = (this->*read)(addr, c) - 1;
+
+    Z = M == A;
+    C = A >= M;
+    N = ((A - M) & 0x80) ? 1 : 0;
+
+    (this->*write)(addr, c, M);
+  }
+
+  /**
+   * Increase memory by one & subtract from accumulator
+   */
+  template<ReadFunc read, WriteFunc write>
+  inline void ISC()
+  {
+    uint16_t r, addr;
+    uint8_t M;
+    bool c;
+
+    M = (this->*read)(addr, c) + 1;
+    r = A - M - !C;
+
+    C = !(r & 0xFF00);
+    Z = (r & 0xFF) == 0;
+    N = (r & 0x80) ? 1 : 0;
+    V = (A & 0x80) != (M & 0x80) && (M & 0x80) == (r & 0x80);
+
+    (this->*write)(addr, c, M);
+    A = r;
+  }
+
+  /**
+   * M <<= 1, A = A | M
+   */
+  template<ReadFunc read, WriteFunc write>
+  inline void SLO()
+  {
+    uint16_t r, addr;
+    uint8_t M;
+    bool c;
+
+    M = (this->*read)(addr, c);
+    C = M & 0x80 ? 1 : 0;
+    M <<= 1;
+
+    A = A | M;
+    Z = A == 0;
+    N = (A & 0x80) ? 1 : 0;
+
+    (this->*write)(addr, c, M);
+  }
+
+  /**
+   * Rotate M left, A = A & M
+   */
+  template<ReadFunc read, WriteFunc write>
+  inline void RLA()
+  {
+    uint16_t r, addr;
+    uint8_t M, newCarry;
+    bool c;
+
+    M = (this->*read)(addr, c);
+
+    newCarry = M & 0x80 ? 1 : 0;
+    M = (M << 1) | C;
+    C = newCarry;
+
+    A = A & M;
+    Z = A == 0;
+    N = (A & 0x80) ? 1 : 0;
+
+    (this->*write)(addr, c, M);
+  }
+
+  /**
+   * Shift M right, A = A ^ M
+   */
+  template<ReadFunc read, WriteFunc write>
+  inline void SRE()
+  {
+    uint16_t addr;
+    uint8_t M, newCarry;
+    bool c;
+
+    M = (this->*read)(addr, c);
+    C = M & 0x01;
+    M >>= 1;
+
+    A = A ^ M;
+    Z = A == 0;
+    N = (A & 0x80) ? 1 : 0;
+
+    (this->*write)(addr, c, M);
+  }
+
+  /**
+   * Rotate M right, A = A + M
+   */
+  template<ReadFunc read, WriteFunc write>
+  inline void RRA()
+  {
+    uint16_t r, addr;
+    uint8_t M, newCarry;
+    bool c;
+
+    M = (this->*read)(addr, c);
+    newCarry = M & 0x01;
+    M = (M >> 1) | (C << 7);
+    (this->*write)(addr, c, M);
+
+    r = M + A + newCarry;
+
+    C = r & 0xFF00 ? 1 : 0;
+    Z = (r & 0xFF) == 0;
+    N = r & 0x80 ? 1 : 0;
+    V = (A & 0x80) == (M & 0x80) && (A & 0x80) != (r & 0x80);
+
+    A = r;
+  }
+
+  /**
+   * Increment or decrement by a constant
+   */
+  template<ReadFunc read, WriteFunc write, int8_t V>
+  inline void IncDec()
+  {
+    uint16_t addr;
+    uint8_t M;
+    bool c;
+
+    M = (this->*read)(addr, c);
+    M += V;
+    Z = M == 0;
+    N = M & 0x80 ? 1 : 0;
+
+    (this->*write)(addr, c, M);
+  }
+
+  /**
+   * Compare
+   */
+  template<ReadFunc fst, ReadFunc snd>
+  inline void CMP()
+  {
+    uint16_t addr;
+    uint8_t M, R;
+    bool c;
+
+    M = (this->*snd)(addr, c);
+    R = (this->*fst)(addr, c);
+
+    Z = M == R;
+    C = R >= M;
+    N = ((R - M) & 0x80) ? 1 : 0;
   }
 
   /**
    * Add with carry
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &)>
+  template<ReadFunc read>
   inline void ADC()
   {
     uint16_t addr, r, M;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
     r = M + A + C;
 
     C = r & 0xFF00 ? 1 : 0;
@@ -229,13 +377,13 @@ private:
   /**
    * Subtract with carry
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &)>
+  template<ReadFunc read>
   inline void SBC()
   {
     uint16_t r, M, addr;
     bool c;
 
-    M = (this->*Read)(addr, c);
+    M = (this->*read)(addr, c);
     r = A - M - !C;
 
     C = !(r & 0xFF00);
@@ -247,54 +395,15 @@ private:
   }
 
   /**
-   * Compare
-   */
-  template<uint8_t (CPU::*ReadR)(uint16_t &, bool &),
-           uint8_t (CPU::*ReadM)(uint16_t &, bool &)>
-  inline void CMP()
-  {
-    uint16_t addr;
-    uint8_t M, R;
-    bool c;
-
-    M = (this->*ReadM)(addr, c);
-    R = (this->*ReadR)(addr, c);
-
-    Z = M == R;
-    C = R >= M;
-    N = ((R - M) & 0x80) ? 1 : 0;
-  }
-
-  /**
-   * Increment or decrement by a constant
-   */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool, uint8_t),
-           int8_t V>
-  inline void IncDec()
-  {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*Read)(addr, c);
-    M += V;
-    Z = M == 0;
-    N = M & 0x80 ? 1 : 0;
-
-    (this->*Write)(addr, c, M);
-  }
-
-  /**
    * Load A & X from memory
    */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &)>
+  template<ReadFunc read>
   inline void LAX()
   {
     uint16_t addr;
     bool c;
 
-    A = X = (this->*Read)(addr, c);
+    A = X = (this->*read)(addr, c);
     Z = A == 0;
     N = A & 0x80 ? 1 : 0;
   }
@@ -302,156 +411,27 @@ private:
   /**
    * M = A & X
    */
-  template<void (CPU::*Write)(uint16_t, bool, uint8_t)>
+  template<WriteFunc write>
   inline void AAX()
   {
-    (this->*Write)(0, false, A & X);
+    (this->*write)(0, false, A & X);
   }
 
-  template<void (CPU::*Write)(uint16_t, bool, uint8_t)>
+  /**
+   * M = A & X & 0x07
+   */
+  template<WriteFunc write>
   inline void AXA()
   {
-    (this->*Write)(0, false, A & X & 0x7);
-  }
-
-  /**
-   * Subtract 1 from memory without borrow
-   */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool, uint8_t)>
-  inline void DCP()
-  {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*Read)(addr, c) - 1;
-
-    Z = M == A;
-    C = A >= M;
-    N = ((A - M) & 0x80) ? 1 : 0;
-
-    (this->*Write)(addr, c, M);
-  }
-
-  /**
-   * Increase memory by one & subtract from accumulator
-   */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool, uint8_t)>
-  inline void ISC()
-  {
-    uint16_t r, addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*Read)(addr, c) + 1;
-    r = A - M - !C;
-
-    C = !(r & 0xFF00);
-    Z = (r & 0xFF) == 0;
-    N = (r & 0x80) ? 1 : 0;
-    V = (A & 0x80) != (M & 0x80) && (M & 0x80) == (r & 0x80);
-
-    (this->*Write)(addr, c, M);
-    A = r;
-  }
-
-  /**
-   * M <<= 1, A = A | M
-   */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool, uint8_t)>
-  inline void SLO()
-  {
-    uint16_t r, addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*Read)(addr, c);
-    C = M & 0x80 ? 1 : 0;
-    M <<= 1;
-
-    A = A | M;
-    Z = A == 0;
-    N = (A & 0x80) ? 1 : 0;
-
-    (this->*Write)(addr, c, M);
-  }
-
-  /**
-   * Rotate M left, A = A & M
-   */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool, uint8_t)>
-  inline void RLA()
-  {
-    uint16_t r, addr;
-    uint8_t M, newCarry;
-    bool c;
-
-    M = (this->*Read)(addr, c);
-
-    newCarry = M & 0x80 ? 1 : 0;
-    M = (M << 1) | C;
-    C = newCarry;
-
-    A = A & M;
-    Z = A == 0;
-    N = (A & 0x80) ? 1 : 0;
-
-    (this->*Write)(addr, c, M);
-  }
-
-  /**
-   * Shift M right, A = A ^ M
-   */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool, uint8_t)>
-  inline void SRE()
-  {
-    uint16_t addr;
-    uint8_t M, newCarry;
-    bool c;
-
-    M = (this->*Read)(addr, c);
-    C = M & 0x01;
-    M >>= 1;
-
-    A = A ^ M;
-    Z = A == 0;
-    N = (A & 0x80) ? 1 : 0;
-
-    (this->*Write)(addr, c, M);
-  }
-
-  /**
-   * Rotate M right, A = A + M
-   */
-  template<uint8_t (CPU::*Read)(uint16_t &, bool &),
-           void (CPU::*Write)(uint16_t, bool, uint8_t)>
-  inline void RRA()
-  {
-    uint16_t r, addr;
-    uint8_t M, newCarry;
-    bool c;
-
-    M = (this->*Read)(addr, c);
-    newCarry = M & 0x01;
-    M = (M >> 1) | (C << 7);
-    (this->*Write)(addr, c, M);
-
-    r = M + A + newCarry;
-
-    C = r & 0xFF00 ? 1 : 0;
-    Z = (r & 0xFF) == 0;
-    N = r & 0x80 ? 1 : 0;
-    V = (A & 0x80) == (M & 0x80) && (A & 0x80) != (r & 0x80);
-
-    A = r;
+    (this->*write)(0, false, A & X & 0x7);
   }
 
 private:
+
+  void PushWord(uint16_t word);
+  void PushByte(uint8_t byte);
+  uint16_t PopWord();
+  uint8_t PopByte();
 
   uint8_t ReadImmediate();
   uint8_t ReadImmediate(uint16_t &addr, bool &c);
@@ -500,6 +480,7 @@ private:
   void WriteX(uint16_t addr, bool c, uint8_t v) { X = v; }
   void WriteY(uint16_t addr, bool c, uint8_t v) { Y = v; }
   void WriteS(uint16_t addr, bool c, uint8_t v) { S = v; }
+
   void WriteZeroPage(uint16_t addr, bool c, uint8_t v);
   void WriteZeroPageX(uint16_t addr, bool c, uint8_t v);
   void WriteZeroPageY(uint16_t addr, bool c, uint8_t v);
@@ -553,38 +534,28 @@ private:
   static IFunPtr IFunTable[0x100];
 
 private:
-  // Accumulator
-  uint8_t A;
-
-  // X index
-  uint8_t X;
-
-  // Y index
-  uint8_t Y;
-
-  // Stack pointer
-  uint8_t S;
-
   // Program counter
   uint16_t PC;
-
-  // Processor flags
-  struct
-  {
-    // Carry flag
-    uint8_t C;
-    // Zero flag
-    uint8_t Z;
-    // Interrupt priority level
-    uint8_t I;
-    // BCD flag
-    uint8_t D;
-    // Overflow flag
-    uint8_t V;
-    // Negative flag (bit 7)
-    uint8_t N;
-  };
-
+  // Accumulator
+  uint8_t A;
+  // X index
+  uint8_t X;
+  // Y index
+  uint8_t Y;
+  // Stack pointer
+  uint8_t S;
+  // P0: Carry flag
+  uint8_t C;
+  // P1: Zero flag
+  uint8_t Z;
+  // P2: Interrupt priority level
+  uint8_t I;
+  // P3: BCD flag
+  uint8_t D;
+  // P4: Overflow flag
+  uint8_t V;
+  // P5: Negative flag
+  uint8_t N;
   /// Emulator reference
   Emulator &emu;
 };
