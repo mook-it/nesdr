@@ -360,23 +360,23 @@ private:
   template<ReadFunc read>
   inline void ADC()
   {
-    uint16_t addr, M;
+    uint16_t addr;
+    uint8_t M;
     bool c;
 
     M = (this->*read)(addr, c);
 
     __asm__ __volatile__
-      ( "movb   %1,    %%dl    \n\t"
-        "movb   %5,    %%dh    \n\t"
+      ( "movb   %1, %%dl       \n\t"
         "addb   $0xFF, %%dl    \n\t"
-        "adcb   %%dh,  %0      \n\t"
+        "adcb   %5, %0         \n\t"
         "setc   %1             \n\t"
         "sets   %2             \n\t"
         "seto   %3             \n\t"
         "setz   %4             \n\t"
       : "+g" (A), "+g" (C), "=q" (N), "=q" (V), "=q" (Z)
-      : "g" (M)
-      : "dx"
+      : "Q" (M)
+      : "dl"
       );
   }
 
