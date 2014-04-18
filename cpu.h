@@ -55,6 +55,7 @@ private:
     bool c;
 
     M = (this->*read)(addr, c);
+
     if (flags)
     {
       Z = M == 0;
@@ -329,9 +330,15 @@ private:
     bool c;
 
     M = (this->*read)(addr, c);
-    M += V;
-    Z = M == 0;
-    N = M & 0x80 ? 1 : 0;
+
+    __asm__
+      ( "addb    %3, %2         \n\t"
+        "setsb   %0             \n\t"
+        "setzb   %1             \n\t"
+      : "=m" (N), "=m" (Z), "+q" (M)
+      : "N" (V)
+      :
+      );
 
     (this->*write)(addr, c, M);
   }
@@ -343,15 +350,17 @@ private:
   inline void CMP()
   {
     uint16_t addr;
-    uint8_t M, R;
     bool c;
 
-    M = (this->*snd)(addr, c);
-    R = (this->*fst)(addr, c);
-
-    Z = M == R;
-    C = R >= M;
-    N = ((R - M) & 0x80) ? 1 : 0;
+    __asm__
+      ( "cmpb    %3, %4         \n\t"
+        "setnbb  %0             \n\t"
+        "setsb   %1             \n\t"
+        "seteb   %2             \n\t"
+      : "=m" (C), "=m" (N), "=m" (Z)
+      : "Q" ((this->*snd)(addr, c)), "q" ((this->*fst)(addr, c))
+      :
+      );
   }
 
   /**
@@ -361,21 +370,18 @@ private:
   inline void ADC()
   {
     uint16_t addr;
-    uint8_t M;
     bool c;
 
-    M = (this->*read)(addr, c);
-
-    __asm__ __volatile__
-      ( "movb   %1, %%dl       \n\t"
-        "addb   $0xFF, %%dl    \n\t"
-        "adcb   %5, %0         \n\t"
-        "setc   %1             \n\t"
-        "sets   %2             \n\t"
-        "seto   %3             \n\t"
-        "setz   %4             \n\t"
-      : "+g" (A), "+g" (C), "=q" (N), "=q" (V), "=q" (Z)
-      : "Q" (M)
+    __asm__
+      ( "movb    %1, %%dl       \n\t"
+        "addb    $0xFF, %%dl    \n\t"     // Set the carry flag
+        "adcb    %5, %0         \n\t"
+        "setcb   %1             \n\t"
+        "setsb   %2             \n\t"
+        "setob   %3             \n\t"
+        "setzb   %4             \n\t"
+      : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
+      : "q" ((this->*read)(addr, c))
       : "dl"
       );
   }
@@ -386,18 +392,21 @@ private:
   template<ReadFunc read>
   inline void SBC()
   {
-    uint16_t r, M, addr;
+    uint16_t addr;
     bool c;
 
-    M = (this->*read)(addr, c);
-    r = A - M - !C;
-
-    C = !(r & 0xFF00);
-    Z = (r & 0xFF) == 0;
-    N = (r & 0x80) ? 1 : 0;
-    V = (A & 0x80) != (M & 0x80) && (M & 0x80) == (r & 0x80);
-
-    A = r;
+    __asm__
+      ( "movb    %1, %%dl       \n\t"
+        "subb    $0x01, %%dl    \n\t"      // Negate the carry flag
+        "sbbb    %5, %0         \n\t"
+        "setncb  %1             \n\t"
+        "setsb   %2             \n\t"
+        "setob   %3             \n\t"
+        "setzb   %4             \n\t"
+      : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
+      : "q" ((this->*read) (addr, c))
+      : "dl"
+      );
   }
 
   /**
@@ -409,9 +418,13 @@ private:
     uint16_t addr;
     bool c;
 
-    A = X = (this->*read)(addr, c);
-    Z = A == 0;
-    N = A & 0x80 ? 1 : 0;
+    __asm__
+      ( "testb   %2, %2         \n\t"
+        "setzb   %1             \n\t"
+        "setsb   %0             \n\t"
+      : "=m" (N), "=m" (Z)
+      : "q" (A = X = (this->*read)(addr, c))
+      );
   }
 
   /**
@@ -434,10 +447,29 @@ private:
 
 private:
 
+  /**
+   * Builds up the value of the P register from individual flags
+   */
+  inline uint8_t GetP()
+  {
+    uint8_t P = 0x20;
+
+    P |= C;
+    P |= Z << 1;
+    P |= I << 2;
+    P |= D << 3;
+    P |= V << 6;
+    P |= N << 7;
+
+    return P;
+  }
+
   void PushWord(uint16_t word);
   void PushByte(uint8_t byte);
   uint16_t PopWord();
   uint8_t PopByte();
+
+private:
 
   uint8_t ReadImmediate();
   uint8_t ReadImmediate(uint16_t &addr, bool &c);
@@ -564,6 +596,8 @@ private:
   uint8_t N;
   /// Emulator reference
   Emulator &emu;
+  /// Cycle counter
+  uint64_t cycles;
 };
 
 #endif /*__CPU_H__*/

@@ -4,8 +4,6 @@
 #include "emu.h"
 
 // -----------------------------------------------------------------------------
-// MMC0
-// -----------------------------------------------------------------------------
 MMC0::MMC0(Memory &mem, INes &cart)
   : Memory::Mapper(mem, cart)
 {
@@ -13,13 +11,11 @@ MMC0::MMC0(Memory &mem, INes &cart)
   mem.LoadBank(1, Memory::HROM);
 }
 
-void
-MMC0::Write(uint16_t addr, uint8_t value)
+// -----------------------------------------------------------------------------
+void MMC0::Write(uint16_t addr, uint8_t value)
 {
 }
 
-// -----------------------------------------------------------------------------
-// MMC1
 // -----------------------------------------------------------------------------
 MMC1::MMC1(Memory &mem, INes &cart)
   : Memory::Mapper(mem, cart)
@@ -38,8 +34,8 @@ MMC1::MMC1(Memory &mem, INes &cart)
   mem.LoadBank(1, Memory::HROM);
 }
 
-void
-MMC1::Write(uint16_t addr, uint8_t value)
+// -----------------------------------------------------------------------------
+void MMC1::Write(uint16_t addr, uint8_t value)
 {
   if (value & 0x80)
   {
@@ -91,8 +87,8 @@ MMC1::Write(uint16_t addr, uint8_t value)
   }
 }
 
-void
-MMC1::UpdatePRG()
+// -----------------------------------------------------------------------------
+void MMC1::UpdatePRG()
 {
   if (P == 0)
   {
@@ -114,8 +110,8 @@ MMC1::UpdatePRG()
   }
 }
 
-void
-MMC1::UpdateCHR()
+// -----------------------------------------------------------------------------
+void MMC1::UpdateCHR()
 {
 
 }

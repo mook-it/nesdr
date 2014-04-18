@@ -3,16 +3,15 @@
 // (C) 2013 Licker Nandor. All rights reserved.
 #include "emu.h"
 
-void
-Emulator::Init(const std::string& file)
+// -----------------------------------------------------------------------------
+void Emulator::Init(const std::string& file)
 {
   mem.LoadINes(file);
-  //mem.LoadBank(0, Memory::HROM);
   cpu.Start();
 }
 
-void
-Emulator::Run()
+// -----------------------------------------------------------------------------
+void Emulator::Run()
 {
   while (1)
   {
@@ -20,14 +19,14 @@ Emulator::Run()
   }
 }
 
-void
-Emulator::Destroy()
+// -----------------------------------------------------------------------------
+void Emulator::Destroy()
 {
 
 }
 
-void
-Emulator::Usage(std::ostream& os)
+// -----------------------------------------------------------------------------
+void Emulator::Usage(std::ostream& os)
 {
   os << "Usage: nesdr rom.nes [options]                 \n";
   os << "Options:                                       \n";
@@ -35,8 +34,8 @@ Emulator::Usage(std::ostream& os)
   os << "  --verbose:   Print detailed information      \n";
 }
 
-void
-Emulator::Main(int argc, char **argv)
+// -----------------------------------------------------------------------------
+void Emulator::Main(int argc, char **argv)
 {
   const char *input = 0;
   int c, option_idx = 0;
@@ -71,8 +70,8 @@ Emulator::Main(int argc, char **argv)
   Destroy();
 }
 
-int
-main(int argc, char **argv)
+// -----------------------------------------------------------------------------
+int main(int argc, char **argv)
 {
   try
   {

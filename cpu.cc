@@ -570,17 +570,8 @@ void CPU::IF2_KIL() { std::cout << "IF2_KIL" << std::endl; exit(0); }
 // -----------------------------------------------------------------------------
 void CPU::I00_BRK()
 {
-  uint8_t P = 0x30;
-  P |= C ? 0x01 : 0x00;
-  P |= Z ? 0x02 : 0x00;
-  P |= I ? 0x04 : 0x00;
-  P |= D ? 0x08 : 0x00;
-  P |= V ? 0x40 : 0x00;
-  P |= N ? 0x80 : 0x00;
-
   PushWord(PC + 1);
-  PushByte(P);
-
+  PushByte(GetP() | 0x10);
   I = 1;
   PC = emu.mem.ReadWord(0xFFFE);
 }

@@ -3,8 +3,8 @@
 // (C) 2013 Licker Nandor. All rights reserved.
 #include "emu.h"
 
-void
-Memory::LoadINes(const std::string& nes)
+// -----------------------------------------------------------------------------
+void Memory::LoadINes(const std::string& nes)
 {
   // Load the file
   cart.reset(new INes(nes));
@@ -22,8 +22,8 @@ Memory::LoadINes(const std::string& nes)
   }
 }
 
-void
-Memory::LoadBank(uint16_t bank, const ROMArea &where)
+// -----------------------------------------------------------------------------
+void Memory::LoadBank(uint16_t bank, const ROMArea &where)
 {
   const std::vector<uint8_t>& rom = cart->GetPRGRom();
   if (bank << 14 > rom.size())
@@ -36,8 +36,8 @@ Memory::LoadBank(uint16_t bank, const ROMArea &where)
   memcpy((where == LROM) ? lrom : hrom, &rom[bank << 14], 0x4000);
 }
 
-uint8_t
-Memory::ReadByte(uint16_t addr)
+// -----------------------------------------------------------------------------
+uint8_t Memory::ReadByte(uint16_t addr)
 {
   // First bank of Game RAM - this path is most likely to be
   // taken as the stack & most runtime variables reside here
@@ -68,8 +68,8 @@ Memory::ReadByte(uint16_t addr)
   return ram[addr & 0x07FF];
 }
 
-void
-Memory::WriteByte(uint16_t addr, uint8_t byte)
+// -----------------------------------------------------------------------------
+void Memory::WriteByte(uint16_t addr, uint8_t byte)
 {
   // First two banks, most likely to be accessed
   if (__builtin_expect(addr < 0x0800, 1))
