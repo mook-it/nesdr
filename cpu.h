@@ -223,9 +223,9 @@ private:
     Z = (r & 0xFF) == 0;
     N = (r & 0x80) ? 1 : 0;
     V = (A & 0x80) != (M & 0x80) && (M & 0x80) == (r & 0x80);
+    A = r;
 
     (this->*write)(addr, c, M);
-    A = r;
   }
 
   /**
@@ -360,18 +360,24 @@ private:
   template<ReadFunc read>
   inline void ADC()
   {
-    uint16_t addr, r, M;
+    uint16_t addr, M;
     bool c;
 
     M = (this->*read)(addr, c);
-    r = M + A + C;
 
-    C = r & 0xFF00 ? 1 : 0;
-    Z = (r & 0xFF) == 0;
-    N = r & 0x80 ? 1 : 0;
-    V = (A & 0x80) == (M & 0x80) && (A & 0x80) != (r & 0x80);
-
-    A = r;
+    __asm__ __volatile__
+      ( "movb   %1,    %%dl    \n\t"
+        "movb   %5,    %%dh    \n\t"
+        "addb   $0xFF, %%dl    \n\t"
+        "adcb   %%dh,  %0      \n\t"
+        "setc   %1             \n\t"
+        "sets   %2             \n\t"
+        "seto   %3             \n\t"
+        "setz   %4             \n\t"
+      : "+g" (A), "+g" (C), "=q" (N), "=q" (V), "=q" (Z)
+      : "g" (M)
+      : "dx"
+      );
   }
 
   /**
