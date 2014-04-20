@@ -81,18 +81,15 @@ public:
   uint8_t ReadByte(uint16_t addr);
 
   /**
-   * Reads a byte from the first page
-   * @param addr 8 bit address inside the first page
+   * Writes a single byte to memory
    */
-  uint8_t ReadByteZeroPage(uint8_t addr)
-  {
-    return ram[addr];
-  }
+  void WriteByte(uint16_t addr, uint8_t byte);
+
   /**
    * Reads a 16 bit word from memory, little endian order
    * @param addr 16 bit address
    */
-  uint16_t ReadWord(uint16_t addr)
+  inline uint16_t ReadWord(uint16_t addr)
   {
     uint8_t low = ReadByte(addr);
     uint8_t high = ReadByte(addr + 1);
@@ -108,10 +105,19 @@ public:
   }
 
   /**
+   * Reads a byte from the first page
+   * @param addr 8 bit address inside the first page
+   */
+  inline uint8_t ReadByteZeroPage(uint8_t addr)
+  {
+    return ram[addr];
+  }
+
+  /**
    * Reads a word from the first page, little endian order
    * If address is 0xFF, LSB is read from 0xFF, MSB from 0x00
    */
-  uint16_t ReadWordZeroPage(uint8_t addr)
+  inline uint16_t ReadWordZeroPage(uint8_t addr)
   {
     return ram[addr] | (ram[(addr + 1) & 0xFF] << 8);
   }
@@ -121,15 +127,10 @@ public:
    * @param addr Zero page address
    * @param byte Data to be written
    */
-  void WriteByteZeroPage(uint8_t addr, uint8_t byte)
+  inline void WriteByteZeroPage(uint8_t addr, uint8_t byte)
   {
     ram[addr] = byte;
   }
-
-  /**
-   * Writes a single byte to memory
-   */
-  void WriteByte(uint16_t addr, uint8_t byte);
 
 private:
   /**

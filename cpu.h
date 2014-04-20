@@ -45,6 +45,14 @@ private:
   typedef void (CPU::*WriteFunc) (uint16_t, bool c, uint8_t);
 
   /**
+   * Conditional branch
+   */
+  inline void Branch(bool branch)
+  {
+    PC += branch ? (int8_t)ReadImmediate() : 1;
+  }
+
+  /**
    * Moves data between registers or memory
    */
   template<ReadFunc read, WriteFunc write, bool flags = true>
@@ -63,14 +71,6 @@ private:
     }
 
     (this->*write)(addr, c, M);
-  }
-
-  /**
-   * Conditional branch
-   */
-  inline void Branch(bool branch)
-  {
-    PC += branch ? (int8_t)ReadImmediate() : 1;
   }
 
   /**
@@ -101,9 +101,18 @@ private:
     bool c;
 
     M = (this->*read)(addr, c);
-    Z = (A & M) == 0;
-    V = M & 0x40 ? 1 : 0;
-    N = M & 0x80 ? 1 : 0;
+
+    __asm__
+      ( "testb   $0x80, %3         \n\t"
+        "setsb   %0                \n\t"
+        "testb   $0x40, %3         \n\t"
+        "setnzb  %1                \n\t"
+        "testb   %3, %4            \n\t"
+        "setzb   %2                \n\t"
+      : "=m" (N), "=m" (V), "=m" (Z)
+      : "r" (M), "m" (A)
+      : "memory", "cc"
+      );
   }
 
   /**
@@ -118,11 +127,18 @@ private:
 
     M = (this->*read)(addr, c);
 
-    newCarry = M & 0x1;
-    M = (C << 7) | (M >> 1);
-    C = newCarry;
-    Z = M == 0;
-    N = M & 0x80 ? 1 : 0;
+    __asm__
+      ( "movb    %1, %%dl       \n\t"
+        "addb    $0xFF, %%dl    \n\t"
+        "rcrb    $1, %0         \n\t"
+        "setcb   %1             \n\t"
+        "testb   $0xFF, %0      \n\t"
+        "setzb   %2             \n\t"
+        "setsb   %3             \n\t"
+      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+      :
+      : "memory", "cc", "dl"
+      );
 
     (this->*write)(addr, c, M);
   }
@@ -139,11 +155,18 @@ private:
 
     M = (this->*read)(addr, c);
 
-    newCarry = M & 0x80;
-    M = C | (M << 1);
-    C = newCarry ? 1 : 0;
-    Z = M == 0;
-    N = M & 0x80 ? 1 : 0;
+    __asm__
+      ( "movb    %1, %%dl       \n\t"
+        "addb    $0xFF, %%dl    \n\t"
+        "rclb    $1, %0         \n\t"
+        "setcb   %1             \n\t"
+        "testb   $0xFF, %0      \n\t"
+        "setzb   %2             \n\t"
+        "setsb   %3             \n\t"
+      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+      :
+      : "memory", "cc", "dl"
+      );
 
     (this->*write)(addr, c, M);
   }

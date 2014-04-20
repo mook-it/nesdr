@@ -19,32 +19,7 @@ void CPU::Start()
 // -----------------------------------------------------------------------------
 void CPU::Tick()
 {
-  uint8_t op;
-
-  op = emu.mem.ReadByte(PC++);
-  static int i;
-
-  uint8_t P = 0x20;
-  P |= C ? 0x01 : 0x00;
-  P |= Z ? 0x02 : 0x00;
-  P |= I ? 0x04 : 0x00;
-  P |= D ? 0x08 : 0x00;
-  P |= V ? 0x40 : 0x00;
-  P |= N ? 0x80 : 0x00;
-
-  if (emu.verbose)
-  {
-    std::cerr << std::setw(4) << std::dec << i + 1 << " "
-              << std::setw(4) << std::hex << PC - 1 << " "
-              << std::setw(2) << (int)op
-              << std::setw(6) << (int)A << " "
-              << std::setw(2) << (int)X << " "
-              << std::setw(2) << (int)Y << " "
-              << std::setw(2) << (int)P << " "
-              << std::setw(2) << (int)S << std::endl;
-  }
-  ++i;
-  (this->*(IFunTable[op])) ();
+  (this->*(IFunTable[emu.mem.ReadByte(PC++)])) ();
 }
 
 // -----------------------------------------------------------------------------
@@ -172,6 +147,25 @@ inline uint8_t CPU::ReadIndirectIndexedY(uint16_t &addr, bool &c)
   return emu.mem.ReadByte(addr);
 }
 
+
+// -----------------------------------------------------------------------------
+inline void CPU::WriteZeroPage(uint16_t addr, bool c, uint8_t v)
+{
+  emu.mem.WriteByte(c ? addr : addr = emu.mem.ReadByte(PC++), v);
+}
+
+// -----------------------------------------------------------------------------
+inline void CPU::WriteZeroPageX(uint16_t addr, bool c, uint8_t v)
+{
+  emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + X) & 0xFF, v);
+}
+
+// -----------------------------------------------------------------------------
+inline void CPU::WriteZeroPageY(uint16_t addr, bool c, uint8_t v)
+{
+  emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + Y) & 0xFF, v);
+}
+
 // -----------------------------------------------------------------------------
 inline void CPU::WriteAbsolute(uint16_t addr, bool c, uint8_t v)
 {
@@ -204,24 +198,6 @@ inline void CPU::WriteAbsoluteY(uint16_t addr, bool c, uint8_t v)
   }
 
   emu.mem.WriteByte(addr, v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteZeroPage(uint16_t addr, bool c, uint8_t v)
-{
-  emu.mem.WriteByte(c ? addr : addr = emu.mem.ReadByte(PC++), v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteZeroPageX(uint16_t addr, bool c, uint8_t v)
-{
-  emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + X) & 0xFF, v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteZeroPageY(uint16_t addr, bool c, uint8_t v)
-{
-  emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + Y) & 0xFF, v);
 }
 
 // -----------------------------------------------------------------------------
