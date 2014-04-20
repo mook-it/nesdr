@@ -40,17 +40,17 @@ private:
     REG_A,
     REG_X,
     REG_Y,
-    REG_IMM,
-    REG_ZP,
-    REG_ZP_X,
-    REG_ZP_Y,
-    REG_ABS,
-    REG_ABS_X,
-    REG_ABS_Y,
-    REG_IDX_IND_X,
-    REG_IDX_IND_Y,
-    REG_IND_IDX_X,
-    REG_IND_IDX_Y
+    IMM,
+    MEM_ZP,
+    MEM_ZP_X,
+    MEM_ZP_Y,
+    MEM_ABS,
+    MEM_ABS_X,
+    MEM_ABS_Y,
+    MEM_IDX_IND_X,
+    MEM_IDX_IND_Y,
+    MEM_IND_IDX_X,
+    MEM_IND_IDX_Y
   };
 
   /**
@@ -111,16 +111,29 @@ private:
   /**
    * Bitwise or
    */
-  template<typename Op, ReadFunc read>
-  inline void Bitwise()
+  inline void ORA(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-    Op op;
+    A = A | M;
+    Z = A == 0;
+    N = A & 0x80 ? 1 : 0;
+  }
 
-    M = (this->*read)(addr, c);
-    A = op(A, M);
+  /**
+   * Bitwise or
+   */
+  inline void AND(uint8_t &M)
+  {
+    A = A & M;
+    Z = A == 0;
+    N = A & 0x80 ? 1 : 0;
+  }
+
+  /**
+   * Bitwise or
+   */
+  inline void EOR(uint8_t &M)
+  {
+    A = A ^ M;
     Z = A == 0;
     N = A & 0x80 ? 1 : 0;
   }
@@ -128,15 +141,8 @@ private:
   /**
    * Bit test
    */
-  template<ReadFunc read>
-  inline void BIT()
+  inline void BIT(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
     __asm__
       ( "testb   $0x80, %3         \n\t"
         "setsb   %0                \n\t"
@@ -148,62 +154,6 @@ private:
       : "r" (M), "m" (A)
       : "memory", "cc"
       );
-  }
-
-  /**
-   * Rotate Right
-   */
-  template<ReadFunc read, WriteFunc write>
-  inline void ROR()
-  {
-    uint8_t M, newCarry;
-    uint16_t addr;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
-    __asm__
-      ( "movb    %1, %%dl       \n\t"
-        "addb    $0xFF, %%dl    \n\t"
-        "rcrb    $1, %0         \n\t"
-        "setcb   %1             \n\t"
-        "testb   $0xFF, %0      \n\t"
-        "setzb   %2             \n\t"
-        "setsb   %3             \n\t"
-      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
-      :
-      : "memory", "cc", "dl"
-      );
-
-    (this->*write)(addr, c, M);
-  }
-
-  /**
-   * Rotate Left
-   */
-  template<ReadFunc read, WriteFunc write>
-  inline void ROL()
-  {
-    uint8_t M, newCarry;
-    uint16_t addr;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
-    __asm__
-      ( "movb    %1, %%dl       \n\t"
-        "addb    $0xFF, %%dl    \n\t"
-        "rclb    $1, %0         \n\t"
-        "setcb   %1             \n\t"
-        "testb   $0xFF, %0      \n\t"
-        "setzb   %2             \n\t"
-        "setsb   %3             \n\t"
-      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
-      :
-      : "memory", "cc", "dl"
-      );
-
-    (this->*write)(addr, c, M);
   }
 
   /**
@@ -220,53 +170,72 @@ private:
   /**
    * Logical shift right
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void LSR()
+  inline void LSR(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
     C = M & 0x01;
     M >>= 1;
     Z = M == 0;
     N = 0;
+  }
 
-    (this->*write)(addr, c, M);
+  /**
+   * Rotate Left
+   */
+  inline void ROL(uint8_t &M)
+  {
+    __asm__
+      ( "movb    %1, %%dl       \n\t"
+        "addb    $0xFF, %%dl    \n\t"
+        "rclb    $1, %0         \n\t"
+        "setcb   %1             \n\t"
+        "testb   $0xFF, %0      \n\t"
+        "setzb   %2             \n\t"
+        "setsb   %3             \n\t"
+      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+      :
+      : "memory", "cc", "dl"
+      );
+  }
+
+  /**
+   * Rotate Right
+   */
+  inline void ROR(uint8_t &M)
+  {
+    __asm__
+      ( "movb    %1, %%dl       \n\t"
+        "addb    $0xFF, %%dl    \n\t"
+        "rcrb    $1, %0         \n\t"
+        "setcb   %1             \n\t"
+        "testb   $0xFF, %0      \n\t"
+        "setzb   %2             \n\t"
+        "setsb   %3             \n\t"
+      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+      :
+      : "memory", "cc", "dl"
+      );
   }
 
   /**
    * Subtract 1 from memory without borrow
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void DCP()
+  inline void DCP(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*read)(addr, c) - 1;
+    M = M - 1;
 
     Z = M == A;
     C = A >= M;
     N = ((A - M) & 0x80) ? 1 : 0;
-
-    (this->*write)(addr, c, M);
   }
 
   /**
    * Increase memory by one & subtract from accumulator
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void ISC()
+  inline void ISC(uint8_t &M)
   {
-    uint16_t r, addr;
-    uint8_t M;
-    bool c;
+    uint16_t r;
 
-    M = (this->*read)(addr, c) + 1;
+    M = M + 1;
     r = A - M - !C;
 
     C = !(r & 0xFF00);
@@ -274,42 +243,30 @@ private:
     N = (r & 0x80) ? 1 : 0;
     V = (A & 0x80) != (M & 0x80) && (M & 0x80) == (r & 0x80);
     A = r;
-
-    (this->*write)(addr, c, M);
   }
 
   /**
    * M <<= 1, A = A | M
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void SLO()
+  inline void SLO(uint8_t &M)
   {
-    uint16_t r, addr;
-    uint8_t M;
-    bool c;
+    uint16_t r;
 
-    M = (this->*read)(addr, c);
     C = M & 0x80 ? 1 : 0;
     M <<= 1;
 
     A = A | M;
     Z = A == 0;
     N = (A & 0x80) ? 1 : 0;
-
-    (this->*write)(addr, c, M);
   }
 
   /**
    * Rotate M left, A = A & M
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void RLA()
+  inline void RLA(uint8_t &M)
   {
-    uint16_t r, addr;
-    uint8_t M, newCarry;
-    bool c;
-
-    M = (this->*read)(addr, c);
+    uint16_t r;
+    uint8_t newCarry;
 
     newCarry = M & 0x80 ? 1 : 0;
     M = (M << 1) | C;
@@ -318,45 +275,33 @@ private:
     A = A & M;
     Z = A == 0;
     N = (A & 0x80) ? 1 : 0;
-
-    (this->*write)(addr, c, M);
   }
 
   /**
    * Shift M right, A = A ^ M
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void SRE()
+  inline void SRE(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M, newCarry;
-    bool c;
+    uint8_t newCarry;
 
-    M = (this->*read)(addr, c);
     C = M & 0x01;
     M >>= 1;
 
     A = A ^ M;
     Z = A == 0;
     N = (A & 0x80) ? 1 : 0;
-
-    (this->*write)(addr, c, M);
   }
 
   /**
    * Rotate M right, A = A + M
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void RRA()
+  inline void RRA(uint8_t &M)
   {
-    uint16_t r, addr;
-    uint8_t M, newCarry;
-    bool c;
+    uint16_t r;
+    uint8_t newCarry;
 
-    M = (this->*read)(addr, c);
     newCarry = M & 0x01;
     M = (M >> 1) | (C << 7);
-    (this->*write)(addr, c, M);
 
     r = M + A + newCarry;
 
@@ -371,15 +316,8 @@ private:
   /**
    * Increment or decrement by a constant
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void Inc()
+  inline void INC(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
     __asm__
       ( "incb    %0             \n\t"
         "setsb   %1             \n\t"
@@ -388,22 +326,13 @@ private:
       :
       : "memory", "cc"
       );
-
-    (this->*write)(addr, c, M);
   }
 
   /**
    * Increment or decrement by a constant
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void Dec()
+  inline void DEC(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
     __asm__
       ( "decb    %0             \n\t"
         "setsb   %1             \n\t"
@@ -412,8 +341,6 @@ private:
       :
       : "memory", "cc"
       );
-
-    (this->*write)(addr, c, M);
   }
 
   /**
@@ -437,14 +364,40 @@ private:
   }
 
   /**
+   * Load A & X from memory
+   */
+  inline void LAX(uint8_t &M)
+  {
+    __asm__
+      ( "testb   %2, %2         \n\t"
+        "setzb   %1             \n\t"
+        "setsb   %0             \n\t"
+      : "=m" (N), "=m" (Z)
+      : "q" (A = X = M)
+      );
+  }
+
+  /**
+   * M = A & X
+   */
+  inline void AAX(uint8_t &M)
+  {
+    M = A & X;
+  }
+
+  /**
+   * M = A & X & 0x07
+   */
+  inline void AXA(uint8_t &M)
+  {
+    M = A & X & 0x7;
+  }
+
+  /**
    * Add with carry
    */
-  template<ReadFunc read>
-  inline void ADC()
+  inline void ADC(uint8_t &M)
   {
-    uint16_t addr;
-    bool c;
-
     __asm__
       ( "movb    %1, %%al       \n\t"
         "addb    $0xFF, %%al    \n\t"     // Set the carry flag
@@ -455,7 +408,7 @@ private:
         "setob   %3             \n\t"
         "setzb   %4             \n\t"
       : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
-      : "g" ((this->*read)(addr, c))
+      : "g" (M)
       : "memory", "cc", "al"
       );
   }
@@ -463,12 +416,8 @@ private:
   /**
    * Subtract with carry
    */
-  template<ReadFunc read>
-  inline void SBC()
+  inline void SBC(uint8_t &M)
   {
-    uint16_t addr;
-    bool c;
-
     __asm__
       ( "movb    %1, %%al       \n\t"
         "subb    $0x01, %%al    \n\t"      // Negate the carry flag
@@ -479,45 +428,9 @@ private:
         "setob   %3             \n\t"
         "setzb   %4             \n\t"
       : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
-      : "g" ((this->*read) (addr, c))
+      : "g" (M)
       : "memory", "cc", "al"
       );
-  }
-
-  /**
-   * Load A & X from memory
-   */
-  template<ReadFunc read>
-  inline void LAX()
-  {
-    uint16_t addr;
-    bool c;
-
-    __asm__
-      ( "testb   %2, %2         \n\t"
-        "setzb   %1             \n\t"
-        "setsb   %0             \n\t"
-      : "=m" (N), "=m" (Z)
-      : "q" (A = X = (this->*read)(addr, c))
-      );
-  }
-
-  /**
-   * M = A & X
-   */
-  template<WriteFunc write>
-  inline void AAX()
-  {
-    (this->*write)(0, false, A & X);
-  }
-
-  /**
-   * M = A & X & 0x07
-   */
-  template<WriteFunc write>
-  inline void AXA()
-  {
-    (this->*write)(0, false, A & X & 0x7);
   }
 
 private:
