@@ -33,6 +33,27 @@ public:
 
 private:
   /**
+   * List of addressing modes
+   */
+  enum AddrMode
+  {
+    REG_A,
+    REG_X,
+    REG_Y,
+    REG_IMM,
+    REG_ZP,
+    REG_ZP_X,
+    REG_ZP_Y,
+    REG_ABS,
+    REG_ABS_X,
+    REG_ABS_Y,
+    REG_IDX_IND_X,
+    REG_IDX_IND_Y,
+    REG_IND_IDX_X,
+    REG_IND_IDX_Y
+  };
+
+  /**
    * Pointer to a function that can retrieve an argument from the
    * address encoded in the instruction
    */
@@ -43,6 +64,20 @@ private:
    * in the instruction
    */
   typedef void (CPU::*WriteFunc) (uint16_t, bool c, uint8_t);
+
+  /**
+   * Performs an instruction, reading in an operand and modifying it
+   */
+  typedef void (CPU::*InstrFunc) (uint8_t &M);
+
+  /**
+   * Wraps functions that read & write to the A register
+   */
+  template <AddrMode Mode>
+  inline void Instr(InstrFunc func, bool read = true, bool write = true)
+  {
+    throw std::runtime_error("unimplemented");
+  }
 
   /**
    * Conditional branch
@@ -174,21 +209,12 @@ private:
   /**
    * Arithmetic shift left
    */
-  template<ReadFunc read, WriteFunc write>
-  inline void ASL()
+  inline void ASL(uint8_t &M)
   {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
     C = M & 0x80 ? 1 : 0;
     M <<= 1;
     Z = M == 0;
     N = M & 0x80 ? 1 : 0;
-
-    (this->*write)(addr, c, M);
   }
 
   /**
@@ -420,16 +446,17 @@ private:
     bool c;
 
     __asm__
-      ( "movb    %1, %%dl       \n\t"
-        "addb    $0xFF, %%dl    \n\t"     // Set the carry flag
-        "adcb    %5, %0         \n\t"
+      ( "movb    %1, %%al       \n\t"
+        "addb    $0xFF, %%al    \n\t"     // Set the carry flag
+        "movb    %5, %%al       \n\t"
+        "adcb    %%al, %0       \n\t"
         "setcb   %1             \n\t"
         "setsb   %2             \n\t"
         "setob   %3             \n\t"
         "setzb   %4             \n\t"
       : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
-      : "q" ((this->*read)(addr, c))
-      : "dl"
+      : "g" ((this->*read)(addr, c))
+      : "memory", "cc", "al"
       );
   }
 
@@ -443,16 +470,17 @@ private:
     bool c;
 
     __asm__
-      ( "movb    %1, %%dl       \n\t"
-        "subb    $0x01, %%dl    \n\t"      // Negate the carry flag
-        "sbbb    %5, %0         \n\t"
+      ( "movb    %1, %%al       \n\t"
+        "subb    $0x01, %%al    \n\t"      // Negate the carry flag
+        "movb    %5, %%al       \n\t"
+        "sbbb    %%al, %0       \n\t"
         "setncb  %1             \n\t"
         "setsb   %2             \n\t"
         "setob   %3             \n\t"
         "setzb   %4             \n\t"
       : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
-      : "q" ((this->*read) (addr, c))
-      : "dl"
+      : "g" ((this->*read) (addr, c))
+      : "memory", "cc", "al"
       );
   }
 

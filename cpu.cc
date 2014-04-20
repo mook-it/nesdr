@@ -54,6 +54,292 @@ inline uint8_t CPU::PopByte()
 }
 
 // -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_A>(CPU::InstrFunc func, bool r, bool w)
+{
+  (this->*func) (A);
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_X>(CPU::InstrFunc func, bool r, bool w)
+{
+  (this->*func) (X);
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_Y>(CPU::InstrFunc func, bool r, bool w)
+{
+  (this->*func) (Y);
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_IMM>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M = emu.mem.ReadByte(PC++);
+  (this->*func) (M);
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_ZP>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M, addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadByte(PC++);
+    M = emu.mem.ReadByteZeroPage(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadByte(PC++);
+    }
+
+    emu.mem.WriteByteZeroPage(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_ZP_X>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M, addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadByte(PC++) + X;
+    M = emu.mem.ReadByteZeroPage(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadByte(PC++) + X;
+    }
+
+    emu.mem.WriteByteZeroPage(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_ZP_Y>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M, addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadByte(PC++) + Y;
+    M = emu.mem.ReadByteZeroPage(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadByte(PC++) + Y;
+    }
+
+    emu.mem.WriteByteZeroPage(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_ABS>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M;
+  uint16_t addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadWord(PC), PC += 2;
+    M = emu.mem.ReadByte(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadWord(PC), PC += 2;
+    }
+
+    emu.mem.WriteByte(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_ABS_X>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M;
+  uint16_t addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadWord(PC) + X, PC += 2;
+    M = emu.mem.ReadByte(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadWord(PC) + X, PC += 2;
+    }
+
+    emu.mem.WriteByte(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_ABS_Y>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M;
+  uint16_t addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadWord(PC) + Y, PC += 2;
+    M = emu.mem.ReadByte(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadWord(PC) + Y, PC += 2;
+    }
+
+    emu.mem.WriteByte(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_IDX_IND_X>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M;
+  uint16_t addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
+    M = emu.mem.ReadByte(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
+    }
+
+    emu.mem.WriteByte(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_IDX_IND_Y>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M;
+  uint16_t addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
+    M = emu.mem.ReadByte(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
+    }
+
+    emu.mem.WriteByte(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_IND_IDX_X>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M;
+  uint16_t addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
+    M = emu.mem.ReadByte(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
+    }
+
+    emu.mem.WriteByte(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
+template <>
+inline void CPU::Instr<CPU::REG_IND_IDX_Y>(CPU::InstrFunc func, bool r, bool w)
+{
+  uint8_t M;
+  uint16_t addr;
+
+  if (r)
+  {
+    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
+    M = emu.mem.ReadByte(addr);
+  }
+
+  (this->*func) (M);
+
+  if (w)
+  {
+    if (!r)
+    {
+      addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
+    }
+
+    emu.mem.WriteByte(addr, M);
+  }
+}
+
+// -----------------------------------------------------------------------------
 inline uint8_t CPU::ReadImmediate()
 {
   return emu.mem.ReadByte(PC++);
@@ -275,11 +561,11 @@ void CPU::I41_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadIndexedIndirectX>(); }
 void CPU::I51_EOR() { Bitwise<bit_xor<uint8_t>, &CPU::ReadIndirectIndexedY>(); }
 
 // -----------------------------------------------------------------------------
-void CPU::I0A_ASL() { ASL<&CPU::ReadA,         &CPU::WriteA>(); }
-void CPU::I06_ASL() { ASL<&CPU::ReadZeroPage,  &CPU::WriteZeroPage>(); }
-void CPU::I16_ASL() { ASL<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX>(); }
-void CPU::I0E_ASL() { ASL<&CPU::ReadAbsolute,  &CPU::WriteAbsolute>(); }
-void CPU::I1E_ASL() { ASL<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX>(); }
+void CPU::I0A_ASL() { Instr<REG_A>    (&CPU::ASL); }
+void CPU::I06_ASL() { Instr<REG_ZP>   (&CPU::ASL); }
+void CPU::I16_ASL() { Instr<REG_ZP_X> (&CPU::ASL); }
+void CPU::I0E_ASL() { Instr<REG_ABS>  (&CPU::ASL); }
+void CPU::I1E_ASL() { Instr<REG_ABS_X>(&CPU::ASL); }
 
 // -----------------------------------------------------------------------------
 void CPU::I4A_LSR() { LSR<&CPU::ReadA,         &CPU::WriteA>(); }
