@@ -322,8 +322,8 @@ private:
   /**
    * Increment or decrement by a constant
    */
-  template<ReadFunc read, WriteFunc write, int8_t V>
-  inline void IncDec()
+  template<ReadFunc read, WriteFunc write>
+  inline void Inc()
   {
     uint16_t addr;
     uint8_t M;
@@ -332,12 +332,36 @@ private:
     M = (this->*read)(addr, c);
 
     __asm__
-      ( "addb    %3, %2         \n\t"
-        "setsb   %0             \n\t"
-        "setzb   %1             \n\t"
-      : "=m" (N), "=m" (Z), "+q" (M)
-      : "N" (V)
+      ( "incb    %0             \n\t"
+        "setsb   %1             \n\t"
+        "setzb   %2             \n\t"
+      :  "+q" (M), "=m" (N), "=m" (Z)
       :
+      : "memory", "cc"
+      );
+
+    (this->*write)(addr, c, M);
+  }
+
+  /**
+   * Increment or decrement by a constant
+   */
+  template<ReadFunc read, WriteFunc write>
+  inline void Dec()
+  {
+    uint16_t addr;
+    uint8_t M;
+    bool c;
+
+    M = (this->*read)(addr, c);
+
+    __asm__
+      ( "decb    %0             \n\t"
+        "setsb   %1             \n\t"
+        "setzb   %2             \n\t"
+      :  "+q" (M), "=m" (N), "=m" (Z)
+      :
+      : "memory", "cc"
       );
 
     (this->*write)(addr, c, M);

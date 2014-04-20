@@ -348,20 +348,20 @@ void CPU::IE1_SBC() { SBC<&CPU::ReadIndexedIndirectX>(); }
 void CPU::IF1_SBC() { SBC<&CPU::ReadIndirectIndexedY>(); }
 
 // -----------------------------------------------------------------------------
-void CPU::ICA_DEX() { IncDec<&CPU::ReadX,         &CPU::WriteX,         -1>(); }
-void CPU::I88_DEY() { IncDec<&CPU::ReadY,         &CPU::WriteY,         -1>(); }
-void CPU::IC6_DEC() { IncDec<&CPU::ReadZeroPage,  &CPU::WriteZeroPage,  -1>(); }
-void CPU::ID6_DEC() { IncDec<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX, -1>(); }
-void CPU::ICE_DEC() { IncDec<&CPU::ReadAbsolute,  &CPU::WriteAbsolute,  -1>(); }
-void CPU::IDE_DEC() { IncDec<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX, -1>(); }
+void CPU::ICA_DEX() { Dec<&CPU::ReadX,         &CPU::WriteX>(); }
+void CPU::I88_DEY() { Dec<&CPU::ReadY,         &CPU::WriteY>(); }
+void CPU::IC6_DEC() { Dec<&CPU::ReadZeroPage,  &CPU::WriteZeroPage>(); }
+void CPU::ID6_DEC() { Dec<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX>(); }
+void CPU::ICE_DEC() { Dec<&CPU::ReadAbsolute,  &CPU::WriteAbsolute>(); }
+void CPU::IDE_DEC() { Dec<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX>(); }
 
 // -----------------------------------------------------------------------------
-void CPU::IE8_INX() { IncDec<&CPU::ReadX,         &CPU::WriteX,          1>(); }
-void CPU::IC8_INY() { IncDec<&CPU::ReadY,         &CPU::WriteY,          1>(); }
-void CPU::IE6_INC() { IncDec<&CPU::ReadZeroPage,  &CPU::WriteZeroPage,   1>(); }
-void CPU::IF6_INC() { IncDec<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX,  1>(); }
-void CPU::IEE_INC() { IncDec<&CPU::ReadAbsolute,  &CPU::WriteAbsolute,   1>(); }
-void CPU::IFE_INC() { IncDec<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX,  1>(); }
+void CPU::IE8_INX() { Inc<&CPU::ReadX,         &CPU::WriteX>(); }
+void CPU::IC8_INY() { Inc<&CPU::ReadY,         &CPU::WriteY>(); }
+void CPU::IE6_INC() { Inc<&CPU::ReadZeroPage,  &CPU::WriteZeroPage>(); }
+void CPU::IF6_INC() { Inc<&CPU::ReadZeroPageX, &CPU::WriteZeroPageX>(); }
+void CPU::IEE_INC() { Inc<&CPU::ReadAbsolute,  &CPU::WriteAbsolute>(); }
+void CPU::IFE_INC() { Inc<&CPU::ReadAbsoluteX, &CPU::WriteAbsoluteX>(); }
 
 // -----------------------------------------------------------------------------
 void CPU::IC9_CMP() { CMP<&CPU::ReadA, &CPU::ReadImmediate>(); }
