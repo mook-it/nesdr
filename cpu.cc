@@ -4,6 +4,110 @@
 #include "emu.h"
 
 // -----------------------------------------------------------------------------
+template <CPU::AddrMode ReadMode, CPU::AddrMode WriteMode>
+inline void CPU::Instr(CPU::InstrFunc instr)
+{
+  uint16_t addr;
+  uint8_t M;
+
+  // Decode the address if it is encoded in the instruction
+  switch (std::max(ReadMode, WriteMode))
+  {
+    case MEM_ZP:
+      addr = emu.mem.ReadByte(PC++);
+      break;
+    case MEM_ZP_X:
+      addr = emu.mem.ReadByte(PC++) + X;
+      break;
+    case MEM_ZP_Y:
+      addr = emu.mem.ReadByte(PC++) + Y;
+      break;
+    case MEM_ABS:
+      addr = emu.mem.ReadWord(PC), PC += 2;
+      break;
+    case MEM_ABS_X:
+      addr = emu.mem.ReadWord(PC) + X, PC += 2;
+      break;
+    case MEM_ABS_Y:
+      addr = emu.mem.ReadWord(PC) + Y, PC += 2;
+      break;
+    case MEM_IDX_X:
+      addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
+      break;
+    case MEM_IDX_Y:
+      addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
+      break;
+    case MEM_IND_X:
+      addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
+      break;
+    case MEM_IND_Y:
+      addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
+      break;
+    default:
+      addr = 0;
+      break;
+  }
+
+  // Read in the input operand
+  switch (ReadMode)
+  {
+    case NOP:
+      break;
+    case REG_A:
+      M = A;
+      break;
+    case REG_X:
+      M = X;
+      break;
+    case REG_Y:
+      M = Y;
+      break;
+    case REG_S:
+      M = S;
+      break;
+    case IMM:
+      M = emu.mem.ReadByte(PC++);
+      break;
+    case MEM_ZP: case MEM_ZP_X: case MEM_ZP_Y:
+      M = emu.mem.ReadByteZeroPage(addr);
+      break;
+    default:
+      M = emu.mem.ReadByte(addr);
+      break;
+  }
+
+  // Run the instruction
+  (this->*instr) (M);
+
+  // Write back the result
+  switch (WriteMode)
+  {
+    case NOP:
+      break;
+    case REG_A:
+      A = M;
+      break;
+    case REG_X:
+      X = M;
+      break;
+    case REG_Y:
+      Y = M;
+      break;
+    case REG_S:
+      S = M;
+      break;
+    case IMM:
+      break;
+    case MEM_ZP: case MEM_ZP_X: case MEM_ZP_Y:
+      emu.mem.WriteByteZeroPage(addr, M);
+      break;
+    default:
+      emu.mem.WriteByte(addr, M);
+      break;
+  }
+}
+
+// -----------------------------------------------------------------------------
 void CPU::Start()
 {
   PC = emu.mem.ReadWord(0xFFFC);
@@ -23,563 +127,445 @@ void CPU::Tick()
 }
 
 // -----------------------------------------------------------------------------
-inline void CPU::PushWord(uint16_t word)
-{
-  emu.mem.WriteByte((0x100 | ((S - 0) & 0xFF)), (word & 0xFF00) >> 8);
-  emu.mem.WriteByte((0x100 | ((S - 1) & 0xFF)), (word & 0x00FF) >> 0);
-  S -= 2;
-}
-
-// -----------------------------------------------------------------------------
 inline void CPU::PushByte(uint8_t byte)
 {
-  emu.mem.WriteByte((0x100 | S--), byte);
+  emu.mem.WriteByteStack(S--, byte);
 }
 
 // -----------------------------------------------------------------------------
-inline uint16_t CPU::PopWord()
+inline void CPU::PushWord(uint16_t word)
 {
-  uint16_t word;
-
-  word = emu.mem.ReadWord(0x100 | ((S + 1) & 0xFF));
-  S += 2;
-
-  return word;
+  emu.mem.WriteByteStack(S--, (word & 0xFF00) >> 8);
+  emu.mem.WriteByteStack(S--, (word & 0x00FF) >> 0);
 }
 
 // -----------------------------------------------------------------------------
 inline uint8_t CPU::PopByte()
 {
-  return emu.mem.ReadByte(0x100 | ++S);
+  return emu.mem.ReadByteStack(++S);
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::REG_A>(CPU::InstrFunc func, bool r, bool w)
+inline uint16_t CPU::PopWord()
 {
-  (this->*func) (A);
+  uint8_t wl, wh;
+
+  wl = emu.mem.ReadByteStack(++S);
+  wh = emu.mem.ReadByteStack(++S);
+
+  return wl | (wh << 8);
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::REG_X>(CPU::InstrFunc func, bool r, bool w)
+inline uint8_t CPU::GetP()
 {
-  (this->*func) (X);
+  uint8_t P = 0x20;
+  P |= C << 0;
+  P |= Z << 1;
+  P |= I << 2;
+  P |= D << 3;
+  P |= V << 6;
+  P |= N << 7;
+  return P;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::REG_Y>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::SetP(uint8_t P)
 {
-  (this->*func) (Y);
+  C = (P & 0x01) >> 0;
+  Z = (P & 0x02) >> 1;
+  I = (P & 0x04) >> 2;
+  D = (P & 0x08) >> 3;
+  V = (P & 0x40) >> 6;
+  N = (P & 0x80) >> 7;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::IMM>(CPU::InstrFunc func, bool r, bool w)
+void CPU::ADC(uint8_t &M)
 {
-  uint8_t M = emu.mem.ReadByte(PC++);
-  (this->*func) (M);
+  __asm__
+    ( "movb    %1, %%al       \n\t"
+      "addb    $0xFF, %%al    \n\t"     // Set the carry flag
+      "movb    %5, %%al       \n\t"
+      "adcb    %%al, %0       \n\t"
+      "setcb   %1             \n\t"
+      "setsb   %2             \n\t"
+      "setob   %3             \n\t"
+      "setzb   %4             \n\t"
+    : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
+    : "g" (M)
+    : "memory", "cc", "al"
+    );
+  M = A;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_ZP>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::Bcc(uint8_t M)
 {
-  uint8_t M, addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadByte(PC++);
-    M = emu.mem.ReadByteZeroPage(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadByte(PC++);
-    }
-
-    emu.mem.WriteByteZeroPage(addr, M);
-  }
+  PC += M ? (int8_t)emu.mem.ReadByte(PC++) : 1;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_ZP_X>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::LDM(uint8_t &M)
 {
-  uint8_t M, addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadByte(PC++) + X;
-    M = emu.mem.ReadByteZeroPage(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadByte(PC++) + X;
-    }
-
-    emu.mem.WriteByteZeroPage(addr, M);
-  }
+  Z = M == 0;
+  N = M & 0x80 ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_ZP_Y>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::STM(uint8_t &M)
 {
-  uint8_t M, addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadByte(PC++) + Y;
-    M = emu.mem.ReadByteZeroPage(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadByte(PC++) + Y;
-    }
-
-    emu.mem.WriteByteZeroPage(addr, M);
-  }
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_ABS>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::ORA(uint8_t &M)
 {
-  uint8_t M;
-  uint16_t addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadWord(PC), PC += 2;
-    M = emu.mem.ReadByte(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadWord(PC), PC += 2;
-    }
-
-    emu.mem.WriteByte(addr, M);
-  }
+  M = A | M;
+  Z = M == 0;
+  N = M & 0x80 ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_ABS_X>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::AND(uint8_t &M)
 {
-  uint8_t M;
-  uint16_t addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadWord(PC) + X, PC += 2;
-    M = emu.mem.ReadByte(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadWord(PC) + X, PC += 2;
-    }
-
-    emu.mem.WriteByte(addr, M);
-  }
+  M = A & M;
+  Z = M == 0;
+  N = M & 0x80 ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_ABS_Y>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::EOR(uint8_t &M)
 {
-  uint8_t M;
-  uint16_t addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadWord(PC) + Y, PC += 2;
-    M = emu.mem.ReadByte(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadWord(PC) + Y, PC += 2;
-    }
-
-    emu.mem.WriteByte(addr, M);
-  }
+  M = A ^ M;
+  Z = M == 0;
+  N = M & 0x80 ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_IDX_IND_X>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::BIT(uint8_t &M)
 {
-  uint8_t M;
-  uint16_t addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
-    M = emu.mem.ReadByte(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
-    }
-
-    emu.mem.WriteByte(addr, M);
-  }
+  __asm__
+    ( "testb   $0x80, %3         \n\t"
+      "setsb   %0                \n\t"
+      "testb   $0x40, %3         \n\t"
+      "setnzb  %1                \n\t"
+      "testb   %3, %4            \n\t"
+      "setzb   %2                \n\t"
+    : "=m" (N), "=m" (V), "=m" (Z)
+    : "r" (M), "m" (A)
+    : "memory", "cc"
+    );
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_IDX_IND_Y>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::ASL(uint8_t &M)
 {
-  uint8_t M;
-  uint16_t addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
-    M = emu.mem.ReadByte(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
-    }
-
-    emu.mem.WriteByte(addr, M);
-  }
+  C = M & 0x80 ? 1 : 0;
+  M <<= 1;
+  Z = M == 0;
+  N = M & 0x80 ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_IND_IDX_X>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::LSR(uint8_t &M)
 {
-  uint8_t M;
-  uint16_t addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
-    M = emu.mem.ReadByte(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
-    }
-
-    emu.mem.WriteByte(addr, M);
-  }
+  C = M & 0x01;
+  M >>= 1;
+  Z = M == 0;
+  N = 0;
 }
 
 // -----------------------------------------------------------------------------
-template <>
-inline void CPU::Instr<CPU::MEM_IND_IDX_Y>(CPU::InstrFunc func, bool r, bool w)
+inline void CPU::ROL(uint8_t &M)
 {
-  uint8_t M;
-  uint16_t addr;
-
-  if (r)
-  {
-    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
-    M = emu.mem.ReadByte(addr);
-  }
-
-  (this->*func) (M);
-
-  if (w)
-  {
-    if (!r)
-    {
-      addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
-    }
-
-    emu.mem.WriteByte(addr, M);
-  }
+  __asm__
+    ( "movb    %1, %%dl       \n\t"
+      "addb    $0xFF, %%dl    \n\t"
+      "rclb    $1, %0         \n\t"
+      "setcb   %1             \n\t"
+      "testb   $0xFF, %0      \n\t"
+      "setzb   %2             \n\t"
+      "setsb   %3             \n\t"
+    : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+    :
+    : "memory", "cc", "dl"
+    );
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadImmediate()
+inline void CPU::ROR(uint8_t &M)
 {
-  return emu.mem.ReadByte(PC++);
+  __asm__
+    ( "movb    %1, %%dl       \n\t"
+      "addb    $0xFF, %%dl    \n\t"
+      "rcrb    $1, %0         \n\t"
+      "setcb   %1             \n\t"
+      "testb   $0xFF, %0      \n\t"
+      "setzb   %2             \n\t"
+      "setsb   %3             \n\t"
+    : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+    :
+    : "memory", "cc", "dl"
+    );
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadImmediate(uint16_t &addr, bool &c)
+inline void CPU::DCP(uint8_t &M)
 {
-  c = true;
-  addr = 0;
-  return emu.mem.ReadByte(PC++);
+  M = M - 1;
+
+  Z = M == A;
+  C = A >= M;
+  N = ((A - M) & 0x80) ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadZeroPage(uint16_t &addr, bool &c)
+inline void CPU::ISC(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadByte(PC++);
-  return emu.mem.ReadByteZeroPage(addr);
+  uint16_t r;
+
+  M = M + 1;
+  r = A - M - !C;
+
+  C = !(r & 0xFF00);
+  Z = (r & 0xFF) == 0;
+  N = (r & 0x80) ? 1 : 0;
+  V = (A & 0x80) != (M & 0x80) && (M & 0x80) == (r & 0x80);
+  A = r;
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadZeroPageX(uint16_t &addr, bool &c)
+inline void CPU::SLO(uint8_t &M)
 {
-  c = true;
-  addr = (emu.mem.ReadByte(PC++) + X) & 0xFF;
-  return emu.mem.ReadByteZeroPage(addr);
+  uint16_t r;
+
+  C = M & 0x80 ? 1 : 0;
+  M <<= 1;
+
+  A = A | M;
+  Z = A == 0;
+  N = (A & 0x80) ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadZeroPageY(uint16_t &addr, bool &c)
+inline void CPU::RLA(uint8_t &M)
 {
-  c = true;
-  addr = (emu.mem.ReadByte(PC++) + Y) & 0xFF;
-  return emu.mem.ReadByteZeroPage(addr);
+  uint16_t r;
+  uint8_t newCarry;
+
+  newCarry = M & 0x80 ? 1 : 0;
+  M = (M << 1) | C;
+  C = newCarry;
+
+  A = A & M;
+  Z = A == 0;
+  N = (A & 0x80) ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadAbsolute(uint16_t &addr, bool &c)
+inline void CPU::SRE(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadWord(PC), PC += 2;
-  return emu.mem.ReadByte(addr);
+  uint8_t newCarry;
+
+  C = M & 0x01;
+  M >>= 1;
+
+  A = A ^ M;
+  Z = A == 0;
+  N = (A & 0x80) ? 1 : 0;
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadAbsoluteX(uint16_t &addr, bool &c)
+inline void CPU::RRA(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadWord(PC) + X, PC += 2;
-  return emu.mem.ReadByte(addr);
+  uint16_t r;
+  uint8_t newCarry;
+
+  newCarry = M & 0x01;
+  M = (M >> 1) | (C << 7);
+
+  r = M + A + newCarry;
+
+  C = r & 0xFF00 ? 1 : 0;
+  Z = (r & 0xFF) == 0;
+  N = r & 0x80 ? 1 : 0;
+  V = (A & 0x80) == (M & 0x80) && (A & 0x80) != (r & 0x80);
+
+  A = r;
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadAbsoluteY(uint16_t &addr, bool &c)
+inline void CPU::INC(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadWord(PC) + Y, PC += 2;
-  return emu.mem.ReadByte(addr);
+  __asm__
+    ( "incb    %0             \n\t"
+      "setsb   %1             \n\t"
+      "setzb   %2             \n\t"
+    :  "+q" (M), "=m" (N), "=m" (Z)
+    :
+    : "memory", "cc"
+    );
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadIndexedIndirectX(uint16_t &addr, bool &c)
+inline void CPU::DEC(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
-  return emu.mem.ReadByte(addr);
+  __asm__
+    ( "decb    %0             \n\t"
+      "setsb   %1             \n\t"
+      "setzb   %2             \n\t"
+    :  "+q" (M), "=m" (N), "=m" (Z)
+    :
+    : "memory", "cc"
+    );
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadIndexedIndirectY(uint16_t &addr, bool &c)
+inline void CPU::CMP(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
-  return emu.mem.ReadByte(addr);
+  __asm__
+    ( "cmpb    %3, %4         \n\t"
+      "setnbb  %0             \n\t"
+      "setsb   %1             \n\t"
+      "seteb   %2             \n\t"
+    : "=m" (C), "=m" (N), "=m" (Z)
+    : "Q" (M), "m" (A)
+    : "memory", "cc"
+    );
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadIndirectIndexedX(uint16_t &addr, bool &c)
+inline void CPU::CPX(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
-  return emu.mem.ReadByte(addr);
+  __asm__
+    ( "cmpb    %3, %4         \n\t"
+      "setnbb  %0             \n\t"
+      "setsb   %1             \n\t"
+      "seteb   %2             \n\t"
+    : "=m" (C), "=m" (N), "=m" (Z)
+    : "Q" (M), "m" (X)
+    : "memory", "cc"
+    );
 }
 
 // -----------------------------------------------------------------------------
-inline uint8_t CPU::ReadIndirectIndexedY(uint16_t &addr, bool &c)
+inline void CPU::CPY(uint8_t &M)
 {
-  c = true;
-  addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
-  return emu.mem.ReadByte(addr);
+  __asm__
+    ( "cmpb    %3, %4         \n\t"
+      "setnbb  %0             \n\t"
+      "setsb   %1             \n\t"
+      "seteb   %2             \n\t"
+    : "=m" (C), "=m" (N), "=m" (Z)
+    : "Q" (M), "m" (Y)
+    : "memory", "cc"
+    );
 }
 
-
 // -----------------------------------------------------------------------------
-inline void CPU::WriteZeroPage(uint16_t addr, bool c, uint8_t v)
+inline void CPU::LAX(uint8_t &M)
 {
-  emu.mem.WriteByte(c ? addr : addr = emu.mem.ReadByte(PC++), v);
+  __asm__
+    ( "testb   %2, %2         \n\t"
+      "setzb   %1             \n\t"
+      "setsb   %0             \n\t"
+    : "=m" (N), "=m" (Z)
+    : "q" (A = X = M)
+    );
 }
 
 // -----------------------------------------------------------------------------
-inline void CPU::WriteZeroPageX(uint16_t addr, bool c, uint8_t v)
+inline void CPU::AAX(uint8_t &M)
 {
-  emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + X) & 0xFF, v);
+  M = A & X;
 }
 
 // -----------------------------------------------------------------------------
-inline void CPU::WriteZeroPageY(uint16_t addr, bool c, uint8_t v)
+inline void CPU::AXA(uint8_t &M)
 {
-  emu.mem.WriteByte(c ? addr : addr = (emu.mem.ReadByte(PC++) + Y) & 0xFF, v);
+  M = A & X & 0x7;
 }
 
+
 // -----------------------------------------------------------------------------
-inline void CPU::WriteAbsolute(uint16_t addr, bool c, uint8_t v)
+void CPU::SBC(uint8_t &M)
 {
-  if (!c)
-  {
-    addr = emu.mem.ReadWord(PC);
-    PC += 2;
-  }
-
-  emu.mem.WriteByte(addr, v);
+  __asm__
+    ( "movb    %1, %%al       \n\t"
+      "subb    $0x01, %%al    \n\t"      // Negate the carry flag
+      "movb    %5, %%al       \n\t"
+      "sbbb    %%al, %0       \n\t"
+      "setncb  %1             \n\t"
+      "setsb   %2             \n\t"
+      "setob   %3             \n\t"
+      "setzb   %4             \n\t"
+    : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
+    : "g" (M)
+    : "memory", "cc", "al"
+    );
+  M = A;
 }
 
 // -----------------------------------------------------------------------------
-inline void CPU::WriteAbsoluteX(uint16_t addr, bool c, uint8_t v)
-{
-  if (!c)
-  {
-    addr = emu.mem.ReadWord(PC) + X, PC += 2;
-  }
-
-  emu.mem.WriteByte(addr, v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteAbsoluteY(uint16_t addr, bool c, uint8_t v)
-{
-  if (!c)
-  {
-    addr = emu.mem.ReadWord(PC) + Y, PC += 2;
-  }
-
-  emu.mem.WriteByte(addr, v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteIndexedIndirectX(uint16_t addr, bool c, uint8_t v)
-{
-  if (!c)
-  {
-    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + X) & 0xFF);
-  }
-
-  emu.mem.WriteByte(addr, v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteIndexedIndirectY(uint16_t addr, bool c, uint8_t v)
-{
-  if (!c)
-  {
-    addr = emu.mem.ReadWordZeroPage((emu.mem.ReadByte(PC++) + Y) & 0xFF);
-  }
-
-  emu.mem.WriteByte(addr, v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteIndirectIndexedX(uint16_t addr, bool c, uint8_t v)
-{
-  if (!c)
-  {
-    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + X;
-  }
-
-  emu.mem.WriteByte(addr, v);
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::WriteIndirectIndexedY(uint16_t addr, bool c, uint8_t v)
-{
-  if (!c)
-  {
-    addr = emu.mem.ReadWordZeroPage(emu.mem.ReadWord(PC++)) + Y;
-  }
-
-  emu.mem.WriteByte(addr, v);
-}
-
-// -----------------------------------------------------------------------------
-void CPU::I09_ORA() { Instr<IMM>           (&CPU::ORA, true, false); }
-void CPU::I05_ORA() { Instr<MEM_ZP>        (&CPU::ORA, true, false); }
-void CPU::I15_ORA() { Instr<MEM_ZP_X>      (&CPU::ORA, true, false); }
-void CPU::I0D_ORA() { Instr<MEM_ABS>       (&CPU::ORA, true, false); }
-void CPU::I1D_ORA() { Instr<MEM_ABS_X>     (&CPU::ORA, true, false); }
-void CPU::I19_ORA() { Instr<MEM_ABS_Y>     (&CPU::ORA, true, false); }
-void CPU::I01_ORA() { Instr<MEM_IDX_IND_X> (&CPU::ORA, true, false); }
-void CPU::I11_ORA() { Instr<MEM_IND_IDX_Y> (&CPU::ORA, true, false); }
-
-// -----------------------------------------------------------------------------
-void CPU::I29_AND() { Instr<IMM>           (&CPU::AND, true, false); }
-void CPU::I25_AND() { Instr<MEM_ZP>        (&CPU::AND, true, false); }
-void CPU::I35_AND() { Instr<MEM_ZP_X>      (&CPU::AND, true, false); }
-void CPU::I2D_AND() { Instr<MEM_ABS>       (&CPU::AND, true, false); }
-void CPU::I3D_AND() { Instr<MEM_ABS_X>     (&CPU::AND, true, false); }
-void CPU::I39_AND() { Instr<MEM_ABS_Y>     (&CPU::AND, true, false); }
-void CPU::I21_AND() { Instr<MEM_IDX_IND_X> (&CPU::AND, true, false); }
-void CPU::I31_AND() { Instr<MEM_IND_IDX_Y> (&CPU::AND, true, false); }
-
-// -----------------------------------------------------------------------------
-void CPU::I49_EOR() { Instr<IMM>           (&CPU::EOR, true, false); }
-void CPU::I45_EOR() { Instr<MEM_ZP>        (&CPU::EOR, true, false); }
-void CPU::I55_EOR() { Instr<MEM_ZP_X>      (&CPU::EOR, true, false); }
-void CPU::I4D_EOR() { Instr<MEM_ABS>       (&CPU::EOR, true, false); }
-void CPU::I5D_EOR() { Instr<MEM_ABS_X>     (&CPU::EOR, true, false); }
-void CPU::I59_EOR() { Instr<MEM_ABS_Y>     (&CPU::EOR, true, false); }
-void CPU::I41_EOR() { Instr<MEM_IDX_IND_X> (&CPU::EOR, true, false); }
-void CPU::I51_EOR() { Instr<MEM_IND_IDX_Y> (&CPU::EOR, true, false); }
-
-// -----------------------------------------------------------------------------
-void CPU::I69_ADC() { Instr<IMM>           (&CPU::ADC, true, false); }
-void CPU::I65_ADC() { Instr<MEM_ZP>        (&CPU::ADC, true, false); }
-void CPU::I75_ADC() { Instr<MEM_ZP_X>      (&CPU::ADC, true, false); }
-void CPU::I6D_ADC() { Instr<MEM_ABS>       (&CPU::ADC, true, false); }
-void CPU::I7D_ADC() { Instr<MEM_ABS_X>     (&CPU::ADC, true, false); }
-void CPU::I79_ADC() { Instr<MEM_ABS_Y>     (&CPU::ADC, true, false); }
-void CPU::I61_ADC() { Instr<MEM_IDX_IND_X> (&CPU::ADC, true, false); }
-void CPU::I71_ADC() { Instr<MEM_IND_IDX_Y> (&CPU::ADC, true, false); }
-
-// -----------------------------------------------------------------------------
-void CPU::IE9_SBC() { Instr<IMM>           (&CPU::SBC, true, false); }
-void CPU::IEB_SBC() { Instr<IMM>           (&CPU::SBC, true, false); }
-void CPU::IE5_SBC() { Instr<MEM_ZP>        (&CPU::SBC, true, false); }
-void CPU::IF5_SBC() { Instr<MEM_ZP_X>      (&CPU::SBC, true, false); }
-void CPU::IED_SBC() { Instr<MEM_ABS>       (&CPU::SBC, true, false); }
-void CPU::IFD_SBC() { Instr<MEM_ABS_X>     (&CPU::SBC, true, false); }
-void CPU::IF9_SBC() { Instr<MEM_ABS_Y>     (&CPU::SBC, true, false); }
-void CPU::IE1_SBC() { Instr<MEM_IDX_IND_X> (&CPU::SBC, true, false); }
-void CPU::IF1_SBC() { Instr<MEM_IND_IDX_Y> (&CPU::SBC, true, false); }
+void CPU::I09_ORA() { Instr<IMM,       REG_A> (&CPU::ORA); }
+void CPU::I05_ORA() { Instr<MEM_ZP,    REG_A> (&CPU::ORA); }
+void CPU::I15_ORA() { Instr<MEM_ZP_X,  REG_A> (&CPU::ORA); }
+void CPU::I0D_ORA() { Instr<MEM_ABS,   REG_A> (&CPU::ORA); }
+void CPU::I1D_ORA() { Instr<MEM_ABS_X, REG_A> (&CPU::ORA); }
+void CPU::I19_ORA() { Instr<MEM_ABS_Y, REG_A> (&CPU::ORA); }
+void CPU::I01_ORA() { Instr<MEM_IDX_X, REG_A> (&CPU::ORA); }
+void CPU::I11_ORA() { Instr<MEM_IND_Y, REG_A> (&CPU::ORA); }
+void CPU::I29_AND() { Instr<IMM,       REG_A> (&CPU::AND); }
+void CPU::I25_AND() { Instr<MEM_ZP,    REG_A> (&CPU::AND); }
+void CPU::I35_AND() { Instr<MEM_ZP_X,  REG_A> (&CPU::AND); }
+void CPU::I2D_AND() { Instr<MEM_ABS,   REG_A> (&CPU::AND); }
+void CPU::I3D_AND() { Instr<MEM_ABS_X, REG_A> (&CPU::AND); }
+void CPU::I39_AND() { Instr<MEM_ABS_Y, REG_A> (&CPU::AND); }
+void CPU::I21_AND() { Instr<MEM_IDX_X, REG_A> (&CPU::AND); }
+void CPU::I31_AND() { Instr<MEM_IND_Y, REG_A> (&CPU::AND); }
+void CPU::I49_EOR() { Instr<IMM,       REG_A> (&CPU::EOR); }
+void CPU::I45_EOR() { Instr<MEM_ZP,    REG_A> (&CPU::EOR); }
+void CPU::I55_EOR() { Instr<MEM_ZP_X,  REG_A> (&CPU::EOR); }
+void CPU::I4D_EOR() { Instr<MEM_ABS,   REG_A> (&CPU::EOR); }
+void CPU::I5D_EOR() { Instr<MEM_ABS_X, REG_A> (&CPU::EOR); }
+void CPU::I59_EOR() { Instr<MEM_ABS_Y, REG_A> (&CPU::EOR); }
+void CPU::I41_EOR() { Instr<MEM_IDX_X, REG_A> (&CPU::EOR); }
+void CPU::I51_EOR() { Instr<MEM_IND_Y, REG_A> (&CPU::EOR); }
+void CPU::I69_ADC() { Instr<IMM,       REG_A> (&CPU::ADC); }
+void CPU::I65_ADC() { Instr<MEM_ZP,    REG_A> (&CPU::ADC); }
+void CPU::I75_ADC() { Instr<MEM_ZP_X,  REG_A> (&CPU::ADC); }
+void CPU::I6D_ADC() { Instr<MEM_ABS,   REG_A> (&CPU::ADC); }
+void CPU::I7D_ADC() { Instr<MEM_ABS_X, REG_A> (&CPU::ADC); }
+void CPU::I79_ADC() { Instr<MEM_ABS_Y, REG_A> (&CPU::ADC); }
+void CPU::I61_ADC() { Instr<MEM_IDX_X, REG_A> (&CPU::ADC); }
+void CPU::I71_ADC() { Instr<MEM_IND_Y, REG_A> (&CPU::ADC); }
+void CPU::IE9_SBC() { Instr<IMM,       REG_A> (&CPU::SBC); }
+void CPU::IEB_SBC() { Instr<IMM,       REG_A> (&CPU::SBC); }
+void CPU::IE5_SBC() { Instr<MEM_ZP,    REG_A> (&CPU::SBC); }
+void CPU::IF5_SBC() { Instr<MEM_ZP_X,  REG_A> (&CPU::SBC); }
+void CPU::IED_SBC() { Instr<MEM_ABS,   REG_A> (&CPU::SBC); }
+void CPU::IFD_SBC() { Instr<MEM_ABS_X, REG_A> (&CPU::SBC); }
+void CPU::IF9_SBC() { Instr<MEM_ABS_Y, REG_A> (&CPU::SBC); }
+void CPU::IE1_SBC() { Instr<MEM_IDX_X, REG_A> (&CPU::SBC); }
+void CPU::IF1_SBC() { Instr<MEM_IND_Y, REG_A> (&CPU::SBC); }
+void CPU::IA1_LDA() { Instr<MEM_IDX_X, REG_A> (&CPU::LDM); }
+void CPU::IA5_LDA() { Instr<MEM_ZP,    REG_A> (&CPU::LDM); }
+void CPU::IA9_LDA() { Instr<IMM,       REG_A> (&CPU::LDM); }
+void CPU::IAD_LDA() { Instr<MEM_ABS,   REG_A> (&CPU::LDM); }
+void CPU::IB1_LDA() { Instr<MEM_IND_Y, REG_A> (&CPU::LDM); }
+void CPU::IB5_LDA() { Instr<MEM_ZP_X,  REG_A> (&CPU::LDM); }
+void CPU::IB9_LDA() { Instr<MEM_ABS_Y, REG_A> (&CPU::LDM); }
+void CPU::IBD_LDA() { Instr<MEM_ABS_X, REG_A> (&CPU::LDM); }
+void CPU::IA0_LDY() { Instr<IMM,       REG_Y> (&CPU::LDM); }
+void CPU::IA4_LDY() { Instr<MEM_ZP,    REG_Y> (&CPU::LDM); }
+void CPU::IAC_LDY() { Instr<MEM_ABS,   REG_Y> (&CPU::LDM); }
+void CPU::IB4_LDY() { Instr<MEM_ZP_X,  REG_Y> (&CPU::LDM); }
+void CPU::IBC_LDY() { Instr<MEM_ABS_X, REG_Y> (&CPU::LDM); }
+void CPU::IA2_LDX() { Instr<IMM,       REG_X> (&CPU::LDM); }
+void CPU::IA6_LDX() { Instr<MEM_ZP,    REG_X> (&CPU::LDM); }
+void CPU::IAE_LDX() { Instr<MEM_ABS,   REG_X> (&CPU::LDM); }
+void CPU::IB6_LDX() { Instr<MEM_ZP_Y,  REG_X> (&CPU::LDM); }
+void CPU::IBE_LDX() { Instr<MEM_ABS_Y, REG_X> (&CPU::LDM); }
 
 // -----------------------------------------------------------------------------
 void CPU::I0A_ASL() { Instr<REG_A>     (&CPU::ASL); }
@@ -587,191 +573,141 @@ void CPU::I06_ASL() { Instr<MEM_ZP>    (&CPU::ASL); }
 void CPU::I16_ASL() { Instr<MEM_ZP_X>  (&CPU::ASL); }
 void CPU::I0E_ASL() { Instr<MEM_ABS>   (&CPU::ASL); }
 void CPU::I1E_ASL() { Instr<MEM_ABS_X> (&CPU::ASL); }
-
-// -----------------------------------------------------------------------------
 void CPU::I4A_LSR() { Instr<REG_A>     (&CPU::LSR); }
 void CPU::I46_LSR() { Instr<MEM_ZP>    (&CPU::LSR); }
 void CPU::I56_LSR() { Instr<MEM_ZP_X>  (&CPU::LSR); }
 void CPU::I4E_LSR() { Instr<MEM_ABS>   (&CPU::LSR); }
 void CPU::I5E_LSR() { Instr<MEM_ABS_X> (&CPU::LSR); }
-
-// -----------------------------------------------------------------------------
 void CPU::I2A_ROL() { Instr<REG_A>     (&CPU::ROL); }
 void CPU::I26_ROL() { Instr<MEM_ZP>    (&CPU::ROL); }
 void CPU::I36_ROL() { Instr<MEM_ZP_X>  (&CPU::ROL); }
 void CPU::I2E_ROL() { Instr<MEM_ABS>   (&CPU::ROL); }
 void CPU::I3E_ROL() { Instr<MEM_ABS_X> (&CPU::ROL); }
-
-// -----------------------------------------------------------------------------
 void CPU::I6A_ROR() { Instr<REG_A>     (&CPU::ROR); }
 void CPU::I66_ROR() { Instr<MEM_ZP>    (&CPU::ROR); }
 void CPU::I76_ROR() { Instr<MEM_ZP_X>  (&CPU::ROR); }
 void CPU::I6E_ROR() { Instr<MEM_ABS>   (&CPU::ROR); }
 void CPU::I7E_ROR() { Instr<MEM_ABS_X> (&CPU::ROR); }
-
-// -----------------------------------------------------------------------------
 void CPU::ICA_DEX() { Instr<REG_X>     (&CPU::DEC); }
 void CPU::I88_DEY() { Instr<REG_Y>     (&CPU::DEC); }
 void CPU::IC6_DEC() { Instr<MEM_ZP>    (&CPU::DEC); }
 void CPU::ID6_DEC() { Instr<MEM_ZP_X>  (&CPU::DEC); }
 void CPU::ICE_DEC() { Instr<MEM_ABS>   (&CPU::DEC); }
 void CPU::IDE_DEC() { Instr<MEM_ABS_X> (&CPU::DEC); }
-
-// -----------------------------------------------------------------------------
 void CPU::IE8_INX() { Instr<REG_X>     (&CPU::INC); }
 void CPU::IC8_INY() { Instr<REG_Y>     (&CPU::INC); }
 void CPU::IE6_INC() { Instr<MEM_ZP>    (&CPU::INC); }
 void CPU::IF6_INC() { Instr<MEM_ZP_X>  (&CPU::INC); }
 void CPU::IEE_INC() { Instr<MEM_ABS>   (&CPU::INC); }
 void CPU::IFE_INC() { Instr<MEM_ABS_X> (&CPU::INC); }
+void CPU::IE7_ISC() { Instr<MEM_ZP>    (&CPU::ISC); }
+void CPU::IF7_ISC() { Instr<MEM_ZP_X>  (&CPU::ISC); }
+void CPU::IEF_ISC() { Instr<MEM_ABS>   (&CPU::ISC); }
+void CPU::IFF_ISC() { Instr<MEM_ABS_X> (&CPU::ISC); }
+void CPU::IFB_ISC() { Instr<MEM_ABS_Y> (&CPU::ISC); }
+void CPU::IE3_ISC() { Instr<MEM_IDX_X> (&CPU::ISC); }
+void CPU::IF3_ISC() { Instr<MEM_IND_Y> (&CPU::ISC); }
+void CPU::IC7_DCP() { Instr<MEM_ZP>    (&CPU::DCP); }
+void CPU::ID7_DCP() { Instr<MEM_ZP_X>  (&CPU::DCP); }
+void CPU::ICF_DCP() { Instr<MEM_ABS>   (&CPU::DCP); }
+void CPU::IDF_DCP() { Instr<MEM_ABS_X> (&CPU::DCP); }
+void CPU::IDB_DCP() { Instr<MEM_ABS_Y> (&CPU::DCP); }
+void CPU::IC3_DCP() { Instr<MEM_IDX_X> (&CPU::DCP); }
+void CPU::ID3_DCP() { Instr<MEM_IND_Y> (&CPU::DCP); }
+void CPU::I07_SLO() { Instr<MEM_ZP>    (&CPU::SLO); }
+void CPU::I17_SLO() { Instr<MEM_ZP_X>  (&CPU::SLO); }
+void CPU::I0F_SLO() { Instr<MEM_ABS>   (&CPU::SLO); }
+void CPU::I1F_SLO() { Instr<MEM_ABS_X> (&CPU::SLO); }
+void CPU::I1B_SLO() { Instr<MEM_ABS_Y> (&CPU::SLO); }
+void CPU::I03_SLO() { Instr<MEM_IDX_X> (&CPU::SLO); }
+void CPU::I13_SLO() { Instr<MEM_IND_Y> (&CPU::SLO); }
+void CPU::I27_RLA() { Instr<MEM_ZP>    (&CPU::RLA); }
+void CPU::I37_RLA() { Instr<MEM_ZP_X>  (&CPU::RLA); }
+void CPU::I2F_RLA() { Instr<MEM_ABS>   (&CPU::RLA); }
+void CPU::I3F_RLA() { Instr<MEM_ABS_X> (&CPU::RLA); }
+void CPU::I3B_RLA() { Instr<MEM_ABS_Y> (&CPU::RLA); }
+void CPU::I23_RLA() { Instr<MEM_IDX_X> (&CPU::RLA); }
+void CPU::I33_RLA() { Instr<MEM_IND_Y> (&CPU::RLA); }
+void CPU::I47_SRE() { Instr<MEM_ZP>    (&CPU::SRE); }
+void CPU::I57_SRE() { Instr<MEM_ZP_X>  (&CPU::SRE); }
+void CPU::I4F_SRE() { Instr<MEM_ABS>   (&CPU::SRE); }
+void CPU::I5F_SRE() { Instr<MEM_ABS_X> (&CPU::SRE); }
+void CPU::I5B_SRE() { Instr<MEM_ABS_Y> (&CPU::SRE); }
+void CPU::I43_SRE() { Instr<MEM_IDX_X> (&CPU::SRE); }
+void CPU::I53_SRE() { Instr<MEM_IND_Y> (&CPU::SRE); }
+void CPU::I67_RRA() { Instr<MEM_ZP>    (&CPU::RRA); }
+void CPU::I77_RRA() { Instr<MEM_ZP_X>  (&CPU::RRA); }
+void CPU::I6F_RRA() { Instr<MEM_ABS>   (&CPU::RRA); }
+void CPU::I7F_RRA() { Instr<MEM_ABS_X> (&CPU::RRA); }
+void CPU::I7B_RRA() { Instr<MEM_ABS_Y> (&CPU::RRA); }
+void CPU::I63_RRA() { Instr<MEM_IDX_X> (&CPU::RRA); }
+void CPU::I73_RRA() { Instr<MEM_IND_Y> (&CPU::RRA); }
+void CPU::IA7_LAX() { Instr<MEM_ZP>    (&CPU::LAX); }
+void CPU::IB7_LAX() { Instr<MEM_ZP_X>  (&CPU::LAX); }
+void CPU::IAF_LAX() { Instr<MEM_ABS>   (&CPU::LAX); }
+void CPU::IBF_LAX() { Instr<MEM_ABS_Y> (&CPU::LAX); }
+void CPU::IA3_LAX() { Instr<MEM_IDX_X> (&CPU::LAX); }
+void CPU::IB3_LAX() { Instr<MEM_IND_Y> (&CPU::LAX); }
+void CPU::I87_AAX() { Instr<MEM_ZP>    (&CPU::AAX); }
+void CPU::I97_AAX() { Instr<MEM_ZP_Y>  (&CPU::AAX); }
+void CPU::I83_AAX() { Instr<MEM_IDX_X> (&CPU::AAX); }
+void CPU::I8F_AAX() { Instr<MEM_ABS>   (&CPU::AAX); }
+void CPU::I93_AXA() { Instr<MEM_IND_Y> (&CPU::AXA); }
+void CPU::I9F_AXA() { Instr<MEM_ABS_Y> (&CPU::AXA); }
 
 // -----------------------------------------------------------------------------
-void CPU::IE7_ISC() { Instr<MEM_ZP>        (&CPU::ISC); }
-void CPU::IF7_ISC() { Instr<MEM_ZP_X>      (&CPU::ISC); }
-void CPU::IEF_ISC() { Instr<MEM_ABS>       (&CPU::ISC); }
-void CPU::IFF_ISC() { Instr<MEM_ABS_X>     (&CPU::ISC); }
-void CPU::IFB_ISC() { Instr<MEM_ABS_Y>     (&CPU::ISC); }
-void CPU::IE3_ISC() { Instr<MEM_IDX_IND_X> (&CPU::ISC); }
-void CPU::IF3_ISC() { Instr<MEM_IND_IDX_Y> (&CPU::ISC); }
+void CPU::I81_STA() { Instr<REG_A, MEM_IDX_X> (&CPU::STM); }
+void CPU::I85_STA() { Instr<REG_A, MEM_ZP>    (&CPU::STM); }
+void CPU::I8D_STA() { Instr<REG_A, MEM_ABS>   (&CPU::STM); }
+void CPU::I91_STA() { Instr<REG_A, MEM_IND_Y> (&CPU::STM); }
+void CPU::I95_STA() { Instr<REG_A, MEM_ZP_X>  (&CPU::STM); }
+void CPU::I99_STA() { Instr<REG_A, MEM_ABS_Y> (&CPU::STM); }
+void CPU::I9D_STA() { Instr<REG_A, MEM_ABS_X> (&CPU::STM); }
+void CPU::I84_STY() { Instr<REG_Y, MEM_ZP>    (&CPU::STM); }
+void CPU::I8C_STY() { Instr<REG_Y, MEM_ABS>   (&CPU::STM); }
+void CPU::I94_STY() { Instr<REG_Y, MEM_ZP_X>  (&CPU::STM); }
+void CPU::I86_STX() { Instr<REG_X, MEM_ZP>    (&CPU::STM); }
+void CPU::I8E_STX() { Instr<REG_X, MEM_ABS>   (&CPU::STM); }
+void CPU::I96_STX() { Instr<REG_X, MEM_ZP_Y>  (&CPU::STM); }
 
 // -----------------------------------------------------------------------------
-void CPU::IC7_DCP() { Instr<MEM_ZP>        (&CPU::DCP); }
-void CPU::ID7_DCP() { Instr<MEM_ZP_X>      (&CPU::DCP); }
-void CPU::ICF_DCP() { Instr<MEM_ABS>       (&CPU::DCP); }
-void CPU::IDF_DCP() { Instr<MEM_ABS_X>     (&CPU::DCP); }
-void CPU::IDB_DCP() { Instr<MEM_ABS_Y>     (&CPU::DCP); }
-void CPU::IC3_DCP() { Instr<MEM_IDX_IND_X> (&CPU::DCP); }
-void CPU::ID3_DCP() { Instr<MEM_IND_IDX_Y> (&CPU::DCP); }
+void CPU::IC9_CMP() { Instr<IMM,       NOP> (&CPU::CMP); }
+void CPU::IC5_CMP() { Instr<MEM_ZP,    NOP> (&CPU::CMP); }
+void CPU::ID5_CMP() { Instr<MEM_ZP_X,  NOP> (&CPU::CMP); }
+void CPU::ICD_CMP() { Instr<MEM_ABS,   NOP> (&CPU::CMP); }
+void CPU::IDD_CMP() { Instr<MEM_ABS_X, NOP> (&CPU::CMP); }
+void CPU::ID9_CMP() { Instr<MEM_ABS_Y, NOP> (&CPU::CMP); }
+void CPU::IC1_CMP() { Instr<MEM_IDX_X, NOP> (&CPU::CMP); }
+void CPU::ID1_CMP() { Instr<MEM_IND_Y, NOP> (&CPU::CMP); }
+void CPU::IC0_CPY() { Instr<IMM,       NOP> (&CPU::CPY); }
+void CPU::IC4_CPY() { Instr<MEM_ZP,    NOP> (&CPU::CPY); }
+void CPU::ICC_CPY() { Instr<MEM_ABS,   NOP> (&CPU::CPY); }
+void CPU::IE0_CPX() { Instr<IMM,       NOP> (&CPU::CPX); }
+void CPU::IE4_CPX() { Instr<MEM_ZP,    NOP> (&CPU::CPX); }
+void CPU::IEC_CPX() { Instr<MEM_ABS,   NOP> (&CPU::CPX); }
+void CPU::I24_BIT() { Instr<MEM_ZP,    NOP> (&CPU::BIT); }
+void CPU::I2C_BIT() { Instr<MEM_ABS,   NOP> (&CPU::BIT); }
 
 // -----------------------------------------------------------------------------
-void CPU::I07_SLO() { Instr<MEM_ZP>        (&CPU::SLO); }
-void CPU::I17_SLO() { Instr<MEM_ZP_X>      (&CPU::SLO); }
-void CPU::I0F_SLO() { Instr<MEM_ABS>       (&CPU::SLO); }
-void CPU::I1F_SLO() { Instr<MEM_ABS_X>     (&CPU::SLO); }
-void CPU::I1B_SLO() { Instr<MEM_ABS_Y>     (&CPU::SLO); }
-void CPU::I03_SLO() { Instr<MEM_IDX_IND_X> (&CPU::SLO); }
-void CPU::I13_SLO() { Instr<MEM_IND_IDX_Y> (&CPU::SLO); }
-
-// -----------------------------------------------------------------------------
-void CPU::I27_RLA() { Instr<MEM_ZP>        (&CPU::RLA); }
-void CPU::I37_RLA() { Instr<MEM_ZP_X>      (&CPU::RLA); }
-void CPU::I2F_RLA() { Instr<MEM_ABS>       (&CPU::RLA); }
-void CPU::I3F_RLA() { Instr<MEM_ABS_X>     (&CPU::RLA); }
-void CPU::I3B_RLA() { Instr<MEM_ABS_Y>     (&CPU::RLA); }
-void CPU::I23_RLA() { Instr<MEM_IDX_IND_X> (&CPU::RLA); }
-void CPU::I33_RLA() { Instr<MEM_IND_IDX_Y> (&CPU::RLA); }
-
-// -----------------------------------------------------------------------------
-void CPU::I47_SRE() { Instr<MEM_ZP>        (&CPU::SRE); }
-void CPU::I57_SRE() { Instr<MEM_ZP_X>      (&CPU::SRE); }
-void CPU::I4F_SRE() { Instr<MEM_ABS>       (&CPU::SRE); }
-void CPU::I5F_SRE() { Instr<MEM_ABS_X>     (&CPU::SRE); }
-void CPU::I5B_SRE() { Instr<MEM_ABS_Y>     (&CPU::SRE); }
-void CPU::I43_SRE() { Instr<MEM_IDX_IND_X> (&CPU::SRE); }
-void CPU::I53_SRE() { Instr<MEM_IND_IDX_Y> (&CPU::SRE); }
-
-// -----------------------------------------------------------------------------
-void CPU::I67_RRA() { Instr<MEM_ZP>        (&CPU::RRA); }
-void CPU::I77_RRA() { Instr<MEM_ZP_X>      (&CPU::RRA); }
-void CPU::I6F_RRA() { Instr<MEM_ABS>       (&CPU::RRA); }
-void CPU::I7F_RRA() { Instr<MEM_ABS_X>     (&CPU::RRA); }
-void CPU::I7B_RRA() { Instr<MEM_ABS_Y>     (&CPU::RRA); }
-void CPU::I63_RRA() { Instr<MEM_IDX_IND_X> (&CPU::RRA); }
-void CPU::I73_RRA() { Instr<MEM_IND_IDX_Y> (&CPU::RRA); }
-
-// -----------------------------------------------------------------------------
-void CPU::IA7_LAX() { Instr<MEM_ZP>        (&CPU::LAX); }
-void CPU::IB7_LAX() { Instr<MEM_ZP_X>      (&CPU::LAX); }
-void CPU::IAF_LAX() { Instr<MEM_ABS>       (&CPU::LAX); }
-void CPU::IBF_LAX() { Instr<MEM_ABS_Y>     (&CPU::LAX); }
-void CPU::IA3_LAX() { Instr<MEM_IDX_IND_X> (&CPU::LAX); }
-void CPU::IB3_LAX() { Instr<MEM_IND_IDX_Y> (&CPU::LAX); }
-
-// -----------------------------------------------------------------------------
-void CPU::I24_BIT() { Instr<MEM_ZP>  (&CPU::BIT, true, false); }
-void CPU::I2C_BIT() { Instr<MEM_ABS> (&CPU::BIT, true, false); }
-
-// -----------------------------------------------------------------------------
-void CPU::I87_AAX() { Instr<MEM_ZP>        (&CPU::AAX); }
-void CPU::I97_AAX() { Instr<MEM_ZP_Y>      (&CPU::AAX); }
-void CPU::I83_AAX() { Instr<MEM_IDX_IND_X> (&CPU::AAX); }
-void CPU::I8F_AAX() { Instr<MEM_ABS>       (&CPU::AAX); }
-
-// -----------------------------------------------------------------------------
-void CPU::I93_AXA() { Instr<MEM_IND_IDX_Y> (&CPU::AXA); }
-void CPU::I9F_AXA() { Instr<MEM_ABS_Y>     (&CPU::AXA); }
-
-// -----------------------------------------------------------------------------
-void CPU::IC9_CMP() { CMP<&CPU::ReadA, &CPU::ReadImmediate>(); }
-void CPU::IC5_CMP() { CMP<&CPU::ReadA, &CPU::ReadZeroPage>(); }
-void CPU::ID5_CMP() { CMP<&CPU::ReadA, &CPU::ReadZeroPageX>(); }
-void CPU::ICD_CMP() { CMP<&CPU::ReadA, &CPU::ReadAbsolute>(); }
-void CPU::IDD_CMP() { CMP<&CPU::ReadA, &CPU::ReadAbsoluteX>(); }
-void CPU::ID9_CMP() { CMP<&CPU::ReadA, &CPU::ReadAbsoluteY>(); }
-void CPU::IC1_CMP() { CMP<&CPU::ReadA, &CPU::ReadIndexedIndirectX>(); }
-void CPU::ID1_CMP() { CMP<&CPU::ReadA, &CPU::ReadIndirectIndexedY>(); }
-void CPU::IC0_CPY() { CMP<&CPU::ReadY, &CPU::ReadImmediate>(); }
-void CPU::IC4_CPY() { CMP<&CPU::ReadY, &CPU::ReadZeroPage>(); }
-void CPU::ICC_CPY() { CMP<&CPU::ReadY, &CPU::ReadAbsolute>(); }
-void CPU::IE0_CPX() { CMP<&CPU::ReadX, &CPU::ReadImmediate>(); }
-void CPU::IE4_CPX() { CMP<&CPU::ReadX, &CPU::ReadZeroPage>(); }
-void CPU::IEC_CPX() { CMP<&CPU::ReadX, &CPU::ReadAbsolute>(); }
-
-// -----------------------------------------------------------------------------
-void CPU::I81_STA() { Move<&CPU::ReadA, &CPU::WriteIndexedIndirectX, false>(); }
-void CPU::I85_STA() { Move<&CPU::ReadA, &CPU::WriteZeroPage,         false>(); }
-void CPU::I8D_STA() { Move<&CPU::ReadA, &CPU::WriteAbsolute,         false>(); }
-void CPU::I91_STA() { Move<&CPU::ReadA, &CPU::WriteIndirectIndexedY, false>(); }
-void CPU::I95_STA() { Move<&CPU::ReadA, &CPU::WriteZeroPageX,        false>(); }
-void CPU::I99_STA() { Move<&CPU::ReadA, &CPU::WriteAbsoluteY,        false>(); }
-void CPU::I9D_STA() { Move<&CPU::ReadA, &CPU::WriteAbsoluteX,        false>(); }
-void CPU::I84_STY() { Move<&CPU::ReadY, &CPU::WriteZeroPage,         false>(); }
-void CPU::I8C_STY() { Move<&CPU::ReadY, &CPU::WriteAbsolute,         false>(); }
-void CPU::I94_STY() { Move<&CPU::ReadY, &CPU::WriteZeroPageX,        false>(); }
-void CPU::I86_STX() { Move<&CPU::ReadX, &CPU::WriteZeroPage,         false>(); }
-void CPU::I8E_STX() { Move<&CPU::ReadX, &CPU::WriteAbsolute,         false>(); }
-void CPU::I96_STX() { Move<&CPU::ReadX, &CPU::WriteZeroPageY,        false>(); }
-
-// -----------------------------------------------------------------------------
-void CPU::IA1_LDA() { Move<&CPU::ReadIndexedIndirectX, &CPU::WriteA>(); }
-void CPU::IA5_LDA() { Move<&CPU::ReadZeroPage,         &CPU::WriteA>(); }
-void CPU::IA9_LDA() { Move<&CPU::ReadImmediate,        &CPU::WriteA>(); }
-void CPU::IAD_LDA() { Move<&CPU::ReadAbsolute,         &CPU::WriteA>(); }
-void CPU::IB1_LDA() { Move<&CPU::ReadIndirectIndexedY, &CPU::WriteA>(); }
-void CPU::IB5_LDA() { Move<&CPU::ReadZeroPageX,        &CPU::WriteA>(); }
-void CPU::IB9_LDA() { Move<&CPU::ReadAbsoluteY,        &CPU::WriteA>(); }
-void CPU::IBD_LDA() { Move<&CPU::ReadAbsoluteX,        &CPU::WriteA>(); }
-void CPU::IA0_LDY() { Move<&CPU::ReadImmediate,        &CPU::WriteY>(); }
-void CPU::IA4_LDY() { Move<&CPU::ReadZeroPage,         &CPU::WriteY>(); }
-void CPU::IAC_LDY() { Move<&CPU::ReadAbsolute,         &CPU::WriteY>(); }
-void CPU::IB4_LDY() { Move<&CPU::ReadZeroPageX,        &CPU::WriteY>(); }
-void CPU::IBC_LDY() { Move<&CPU::ReadAbsoluteX,        &CPU::WriteY>(); }
-void CPU::IA2_LDX() { Move<&CPU::ReadImmediate,        &CPU::WriteX>(); }
-void CPU::IA6_LDX() { Move<&CPU::ReadZeroPage,         &CPU::WriteX>(); }
-void CPU::IAE_LDX() { Move<&CPU::ReadAbsolute,         &CPU::WriteX>(); }
-void CPU::IB6_LDX() { Move<&CPU::ReadZeroPageY,        &CPU::WriteX>(); }
-void CPU::IBE_LDX() { Move<&CPU::ReadAbsoluteY,        &CPU::WriteX>(); }
-
-// -----------------------------------------------------------------------------
-void CPU::I8A_TXA() { Move<&CPU::ReadX, &CPU::WriteA>(); }
-void CPU::IAA_TAX() { Move<&CPU::ReadA, &CPU::WriteX>(); }
-void CPU::I98_TYA() { Move<&CPU::ReadY, &CPU::WriteA>(); }
-void CPU::IA8_TAY() { Move<&CPU::ReadA, &CPU::WriteY>(); }
-void CPU::IBA_TSX() { Move<&CPU::ReadS, &CPU::WriteX>(); }
-void CPU::I9A_TXS() { S = X; }
+void CPU::I8A_TXA() { Instr<REG_X, REG_A> (&CPU::LDM); }
+void CPU::IAA_TAX() { Instr<REG_A, REG_X> (&CPU::LDM); }
+void CPU::I98_TYA() { Instr<REG_Y, REG_A> (&CPU::LDM); }
+void CPU::IA8_TAY() { Instr<REG_A, REG_Y> (&CPU::LDM); }
+void CPU::IBA_TSX() { Instr<REG_S, REG_X> (&CPU::LDM); }
+void CPU::I9A_TXS() { Instr<REG_X, REG_S> (&CPU::STM); }
 
 // -----------------------------------------------------------------------------
 void CPU::IEA_NOP() { }
 
 // -----------------------------------------------------------------------------
-void CPU::I10_BPL() { Branch(!N); }
-void CPU::I50_BVC() { Branch(!V); }
-void CPU::I90_BCC() { Branch(!C); }
-void CPU::ID0_BNE() { Branch(!Z); }
-void CPU::I30_BMI() { Branch(N); }
-void CPU::I70_BVS() { Branch(V); }
-void CPU::IB0_BCS() { Branch(C); }
-void CPU::IF0_BEQ() { Branch(Z); }
+void CPU::I10_BPL() { Bcc(!N); }
+void CPU::I50_BVC() { Bcc(!V); }
+void CPU::I90_BCC() { Bcc(!C); }
+void CPU::ID0_BNE() { Bcc(!Z); }
+void CPU::I30_BMI() { Bcc(N); }
+void CPU::I70_BVS() { Bcc(V); }
+void CPU::IB0_BCS() { Bcc(C); }
+void CPU::IF0_BEQ() { Bcc(Z); }
 
 // -----------------------------------------------------------------------------
 void CPU::I18_CLC() { C = false; }
@@ -881,26 +817,13 @@ void CPU::I6C_JMP()
 // -----------------------------------------------------------------------------
 void CPU::I08_PHP()
 {
-  uint8_t P = 0x30;
-  P |= C ? 0x01 : 0x00;
-  P |= Z ? 0x02 : 0x00;
-  P |= I ? 0x04 : 0x00;
-  P |= D ? 0x08 : 0x00;
-  P |= V ? 0x40 : 0x00;
-  P |= N ? 0x80 : 0x00;
-  PushByte(P);
+  PushByte(GetP() | 0x10);
 }
 
 // -----------------------------------------------------------------------------
 void CPU::I28_PLP()
 {
-  uint8_t P = PopByte();
-  C = P & 0x01 ? 1 : 0;
-  Z = P & 0x02 ? 1 : 0;
-  I = P & 0x04 ? 1 : 0;
-  D = P & 0x08 ? 1 : 0;
-  V = P & 0x40 ? 1 : 0;
-  N = P & 0x80 ? 1 : 0;
+  SetP(PopByte());
 }
 
 // -----------------------------------------------------------------------------
@@ -920,7 +843,7 @@ void CPU::I68_PLA()
 // -----------------------------------------------------------------------------
 void CPU::I0B_AAC()
 {
-  A = A & ReadImmediate();
+  A = A & emu.mem.ReadByte(PC++);
   Z = A == 0;
   N = C = A & 0x80 ? 1 : 0;
 }
@@ -928,7 +851,7 @@ void CPU::I0B_AAC()
 // -----------------------------------------------------------------------------
 void CPU::I2B_AAC()
 {
-  A = A & ReadImmediate();
+  A = A & emu.mem.ReadByte(PC++);
   Z = A == 0;
   N = C = A & 0x80 ? 1 : 0;
 }
@@ -936,7 +859,7 @@ void CPU::I2B_AAC()
 // -----------------------------------------------------------------------------
 void CPU::I4B_ASR()
 {
-  A = A & ReadImmediate();
+  A = A & emu.mem.ReadByte(PC++);
   C = A & 0x01;
   A >>= 1;
   Z = A == 0;
@@ -946,7 +869,7 @@ void CPU::I4B_ASR()
 // -----------------------------------------------------------------------------
 void CPU::I6B_ARR()
 {
-  A = A & ReadImmediate();
+  A = A & emu.mem.ReadByte(PC++);
   A = (A >> 1) | (C << 7);
   N = A & 0x80 ? 1 : 0;
   Z = A == 0;
@@ -957,7 +880,7 @@ void CPU::I6B_ARR()
 // -----------------------------------------------------------------------------
 void CPU::IAB_ATX()
 {
-  X = A = ReadImmediate();
+  X = A = emu.mem.ReadByte(PC++);
   Z = X == 0;
   N = X & 0x80 ? 1 : 0;
 }
@@ -967,7 +890,7 @@ void CPU::ICB_AXS()
 {
   uint16_t r;
 
-  r = (A & X) - ReadImmediate();
+  r = (A & X) - emu.mem.ReadByte(PC++);
 
   C = !(r & 0xFF00);
   Z = (r & 0xFF) == 0;

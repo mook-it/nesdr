@@ -132,6 +132,22 @@ public:
     ram[addr] = byte;
   }
 
+  /**
+   * Writes a byte to the stack space
+   */
+  inline void WriteByteStack(uint8_t addr, uint8_t byte)
+  {
+    ram[0x100 | addr] = byte;
+  }
+
+  /**
+   * Reads a byte from the stack space
+   */
+  inline uint8_t ReadByteStack(uint8_t addr)
+  {
+    return ram[0x100 | addr];
+  }
+
 private:
   /**
    * +-----------------+--------+-----------------------------+

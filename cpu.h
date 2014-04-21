@@ -37,9 +37,11 @@ private:
    */
   enum AddrMode
   {
+    NOP,
     REG_A,
     REG_X,
     REG_Y,
+    REG_S,
     IMM,
     MEM_ZP,
     MEM_ZP_X,
@@ -47,23 +49,41 @@ private:
     MEM_ABS,
     MEM_ABS_X,
     MEM_ABS_Y,
-    MEM_IDX_IND_X,
-    MEM_IDX_IND_Y,
-    MEM_IND_IDX_X,
-    MEM_IND_IDX_Y
+    MEM_IDX_X,
+    MEM_IDX_Y,
+    MEM_IND_X,
+    MEM_IND_Y
   };
 
   /**
-   * Pointer to a function that can retrieve an argument from the
-   * address encoded in the instruction
+   * Returns the value of the P register by or-ing the values of the flags
    */
-  typedef uint8_t (CPU::*ReadFunc) (uint16_t &, bool &);
+  uint8_t GetP();
 
   /**
-   * Pointer to a function that can stores a result at an address encoded
-   * in the instruction
+   * Reads the values of flags from the P register
    */
-  typedef void (CPU::*WriteFunc) (uint16_t, bool c, uint8_t);
+  void SetP(uint8_t P);
+
+  /**
+   * Pushes a word onto the stack, decrementing S by 2
+   */
+  void PushWord(uint16_t word);
+
+  /**
+   * Pushes a byte onto the stack, decrementing S by 1
+   */
+  void PushByte(uint8_t byte);
+
+  /**
+   * Pops a word from the stack, incrementing S by 2
+   */
+  uint16_t PopWord();
+
+  /**
+   * Pops a byte from the stack, incrementing S by 1
+   */
+  uint8_t PopByte();
 
   /**
    * Performs an instruction, reading in an operand and modifying it
@@ -71,452 +91,38 @@ private:
   typedef void (CPU::*InstrFunc) (uint8_t &M);
 
   /**
-   * Wraps functions that read & write to the A register
+   * Wraps functions that read & write
    */
-  template <AddrMode Mode>
-  inline void Instr(InstrFunc func, bool read = true, bool write = true)
-  {
-    throw std::runtime_error("unimplemented");
-  }
+  template <AddrMode ReadMode, AddrMode WriteMode = ReadMode>
+  inline void Instr(InstrFunc func);
 
-  /**
-   * Conditional branch
-   */
-  inline void Branch(bool branch)
-  {
-    PC += branch ? (int8_t)ReadImmediate() : 1;
-  }
-
-  /**
-   * Moves data between registers or memory
-   */
-  template<ReadFunc read, WriteFunc write, bool flags = true>
-  inline void Move()
-  {
-    uint16_t addr;
-    uint8_t M;
-    bool c;
-
-    M = (this->*read)(addr, c);
-
-    if (flags)
-    {
-      Z = M == 0;
-      N = M & 0x80 ? 1 : 0;
-    }
-
-    (this->*write)(addr, c, M);
-  }
-
-  /**
-   * Bitwise or
-   */
-  inline void ORA(uint8_t &M)
-  {
-    A = A | M;
-    Z = A == 0;
-    N = A & 0x80 ? 1 : 0;
-  }
-
-  /**
-   * Bitwise or
-   */
-  inline void AND(uint8_t &M)
-  {
-    A = A & M;
-    Z = A == 0;
-    N = A & 0x80 ? 1 : 0;
-  }
-
-  /**
-   * Bitwise or
-   */
-  inline void EOR(uint8_t &M)
-  {
-    A = A ^ M;
-    Z = A == 0;
-    N = A & 0x80 ? 1 : 0;
-  }
-
-  /**
-   * Bit test
-   */
-  inline void BIT(uint8_t &M)
-  {
-    __asm__
-      ( "testb   $0x80, %3         \n\t"
-        "setsb   %0                \n\t"
-        "testb   $0x40, %3         \n\t"
-        "setnzb  %1                \n\t"
-        "testb   %3, %4            \n\t"
-        "setzb   %2                \n\t"
-      : "=m" (N), "=m" (V), "=m" (Z)
-      : "r" (M), "m" (A)
-      : "memory", "cc"
-      );
-  }
-
-  /**
-   * Arithmetic shift left
-   */
-  inline void ASL(uint8_t &M)
-  {
-    C = M & 0x80 ? 1 : 0;
-    M <<= 1;
-    Z = M == 0;
-    N = M & 0x80 ? 1 : 0;
-  }
-
-  /**
-   * Logical shift right
-   */
-  inline void LSR(uint8_t &M)
-  {
-    C = M & 0x01;
-    M >>= 1;
-    Z = M == 0;
-    N = 0;
-  }
-
-  /**
-   * Rotate Left
-   */
-  inline void ROL(uint8_t &M)
-  {
-    __asm__
-      ( "movb    %1, %%dl       \n\t"
-        "addb    $0xFF, %%dl    \n\t"
-        "rclb    $1, %0         \n\t"
-        "setcb   %1             \n\t"
-        "testb   $0xFF, %0      \n\t"
-        "setzb   %2             \n\t"
-        "setsb   %3             \n\t"
-      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
-      :
-      : "memory", "cc", "dl"
-      );
-  }
-
-  /**
-   * Rotate Right
-   */
-  inline void ROR(uint8_t &M)
-  {
-    __asm__
-      ( "movb    %1, %%dl       \n\t"
-        "addb    $0xFF, %%dl    \n\t"
-        "rcrb    $1, %0         \n\t"
-        "setcb   %1             \n\t"
-        "testb   $0xFF, %0      \n\t"
-        "setzb   %2             \n\t"
-        "setsb   %3             \n\t"
-      : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
-      :
-      : "memory", "cc", "dl"
-      );
-  }
-
-  /**
-   * Subtract 1 from memory without borrow
-   */
-  inline void DCP(uint8_t &M)
-  {
-    M = M - 1;
-
-    Z = M == A;
-    C = A >= M;
-    N = ((A - M) & 0x80) ? 1 : 0;
-  }
-
-  /**
-   * Increase memory by one & subtract from accumulator
-   */
-  inline void ISC(uint8_t &M)
-  {
-    uint16_t r;
-
-    M = M + 1;
-    r = A - M - !C;
-
-    C = !(r & 0xFF00);
-    Z = (r & 0xFF) == 0;
-    N = (r & 0x80) ? 1 : 0;
-    V = (A & 0x80) != (M & 0x80) && (M & 0x80) == (r & 0x80);
-    A = r;
-  }
-
-  /**
-   * M <<= 1, A = A | M
-   */
-  inline void SLO(uint8_t &M)
-  {
-    uint16_t r;
-
-    C = M & 0x80 ? 1 : 0;
-    M <<= 1;
-
-    A = A | M;
-    Z = A == 0;
-    N = (A & 0x80) ? 1 : 0;
-  }
-
-  /**
-   * Rotate M left, A = A & M
-   */
-  inline void RLA(uint8_t &M)
-  {
-    uint16_t r;
-    uint8_t newCarry;
-
-    newCarry = M & 0x80 ? 1 : 0;
-    M = (M << 1) | C;
-    C = newCarry;
-
-    A = A & M;
-    Z = A == 0;
-    N = (A & 0x80) ? 1 : 0;
-  }
-
-  /**
-   * Shift M right, A = A ^ M
-   */
-  inline void SRE(uint8_t &M)
-  {
-    uint8_t newCarry;
-
-    C = M & 0x01;
-    M >>= 1;
-
-    A = A ^ M;
-    Z = A == 0;
-    N = (A & 0x80) ? 1 : 0;
-  }
-
-  /**
-   * Rotate M right, A = A + M
-   */
-  inline void RRA(uint8_t &M)
-  {
-    uint16_t r;
-    uint8_t newCarry;
-
-    newCarry = M & 0x01;
-    M = (M >> 1) | (C << 7);
-
-    r = M + A + newCarry;
-
-    C = r & 0xFF00 ? 1 : 0;
-    Z = (r & 0xFF) == 0;
-    N = r & 0x80 ? 1 : 0;
-    V = (A & 0x80) == (M & 0x80) && (A & 0x80) != (r & 0x80);
-
-    A = r;
-  }
-
-  /**
-   * Increment or decrement by a constant
-   */
-  inline void INC(uint8_t &M)
-  {
-    __asm__
-      ( "incb    %0             \n\t"
-        "setsb   %1             \n\t"
-        "setzb   %2             \n\t"
-      :  "+q" (M), "=m" (N), "=m" (Z)
-      :
-      : "memory", "cc"
-      );
-  }
-
-  /**
-   * Increment or decrement by a constant
-   */
-  inline void DEC(uint8_t &M)
-  {
-    __asm__
-      ( "decb    %0             \n\t"
-        "setsb   %1             \n\t"
-        "setzb   %2             \n\t"
-      :  "+q" (M), "=m" (N), "=m" (Z)
-      :
-      : "memory", "cc"
-      );
-  }
-
-  /**
-   * Compare
-   */
-  template<ReadFunc fst, ReadFunc snd>
-  inline void CMP()
-  {
-    uint16_t addr;
-    bool c;
-
-    __asm__
-      ( "cmpb    %3, %4         \n\t"
-        "setnbb  %0             \n\t"
-        "setsb   %1             \n\t"
-        "seteb   %2             \n\t"
-      : "=m" (C), "=m" (N), "=m" (Z)
-      : "Q" ((this->*snd)(addr, c)), "q" ((this->*fst)(addr, c))
-      :
-      );
-  }
-
-  /**
-   * Load A & X from memory
-   */
-  inline void LAX(uint8_t &M)
-  {
-    __asm__
-      ( "testb   %2, %2         \n\t"
-        "setzb   %1             \n\t"
-        "setsb   %0             \n\t"
-      : "=m" (N), "=m" (Z)
-      : "q" (A = X = M)
-      );
-  }
-
-  /**
-   * M = A & X
-   */
-  inline void AAX(uint8_t &M)
-  {
-    M = A & X;
-  }
-
-  /**
-   * M = A & X & 0x07
-   */
-  inline void AXA(uint8_t &M)
-  {
-    M = A & X & 0x7;
-  }
-
-  /**
-   * Add with carry
-   */
-  inline void ADC(uint8_t &M)
-  {
-    __asm__
-      ( "movb    %1, %%al       \n\t"
-        "addb    $0xFF, %%al    \n\t"     // Set the carry flag
-        "movb    %5, %%al       \n\t"
-        "adcb    %%al, %0       \n\t"
-        "setcb   %1             \n\t"
-        "setsb   %2             \n\t"
-        "setob   %3             \n\t"
-        "setzb   %4             \n\t"
-      : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
-      : "g" (M)
-      : "memory", "cc", "al"
-      );
-  }
-
-  /**
-   * Subtract with carry
-   */
-  inline void SBC(uint8_t &M)
-  {
-    __asm__
-      ( "movb    %1, %%al       \n\t"
-        "subb    $0x01, %%al    \n\t"      // Negate the carry flag
-        "movb    %5, %%al       \n\t"
-        "sbbb    %%al, %0       \n\t"
-        "setncb  %1             \n\t"
-        "setsb   %2             \n\t"
-        "setob   %3             \n\t"
-        "setzb   %4             \n\t"
-      : "+m" (A), "+m" (C), "=m" (N), "=m" (V), "=m" (Z)
-      : "g" (M)
-      : "memory", "cc", "al"
-      );
-  }
-
-private:
-
-  /**
-   * Builds up the value of the P register from individual flags
-   */
-  inline uint8_t GetP()
-  {
-    uint8_t P = 0x20;
-
-    P |= C;
-    P |= Z << 1;
-    P |= I << 2;
-    P |= D << 3;
-    P |= V << 6;
-    P |= N << 7;
-
-    return P;
-  }
-
-  void PushWord(uint16_t word);
-  void PushByte(uint8_t byte);
-  uint16_t PopWord();
-  uint8_t PopByte();
-
-private:
-
-  uint8_t ReadImmediate();
-  uint8_t ReadImmediate(uint16_t &addr, bool &c);
-  uint8_t ReadZeroPage(uint16_t &addr, bool &c);
-  uint8_t ReadZeroPageX(uint16_t &addr, bool &c);
-  uint8_t ReadZeroPageY(uint16_t &addr, bool &c);
-  uint8_t ReadAbsolute(uint16_t &addr, bool &c);
-  uint8_t ReadAbsoluteX(uint16_t &addr, bool &c);
-  uint8_t ReadAbsoluteY(uint16_t &addr, bool &c);
-  uint8_t ReadIndexedIndirectX(uint16_t &addr, bool &c);
-  uint8_t ReadIndexedIndirectY(uint16_t &addr, bool &c);
-  uint8_t ReadIndirectIndexedX(uint16_t &addr, bool &c);
-  uint8_t ReadIndirectIndexedY(uint16_t &addr, bool &c);
-
-  inline uint8_t ReadA(uint16_t &addr, bool &c)
-  {
-    addr = 0;
-    c = false;
-    return A;
-  }
-
-  inline uint8_t ReadX(uint16_t &addr, bool &c)
-  {
-    addr = 0;
-    c = false;
-    return X;
-  }
-
-  inline uint8_t ReadY(uint16_t &addr, bool &c)
-  {
-    addr = 0;
-    c = false;
-    return Y;
-  }
-
-  inline uint8_t ReadS(uint16_t &addr, bool &c)
-  {
-    addr = 0;
-    c = false;
-    return S;
-  }
-
-private:
-
-  void WriteA(uint16_t addr, bool c, uint8_t v) { A = v; }
-  void WriteX(uint16_t addr, bool c, uint8_t v) { X = v; }
-  void WriteY(uint16_t addr, bool c, uint8_t v) { Y = v; }
-  void WriteS(uint16_t addr, bool c, uint8_t v) { S = v; }
-
-  void WriteZeroPage(uint16_t addr, bool c, uint8_t v);
-  void WriteZeroPageX(uint16_t addr, bool c, uint8_t v);
-  void WriteZeroPageY(uint16_t addr, bool c, uint8_t v);
-  void WriteAbsolute(uint16_t addr, bool c, uint8_t v);
-  void WriteAbsoluteX(uint16_t addr, bool c, uint8_t v);
-  void WriteAbsoluteY(uint16_t addr, bool c, uint8_t v);
-  void WriteIndexedIndirectX(uint16_t addr, bool c, uint8_t v);
-  void WriteIndexedIndirectY(uint16_t addr, bool c, uint8_t v);
-  void WriteIndirectIndexedX(uint16_t addr, bool c, uint8_t v);
-  void WriteIndirectIndexedY(uint16_t addr, bool c, uint8_t v);
+  void AAX(uint8_t &M);
+  void ADC(uint8_t &M);
+  void AND(uint8_t &M);
+  void ASL(uint8_t &M);
+  void AXA(uint8_t &M);
+  void Bcc(uint8_t  M);
+  void BIT(uint8_t &M);
+  void CMP(uint8_t &M);
+  void CPX(uint8_t &M);
+  void CPY(uint8_t &M);
+  void DCP(uint8_t &M);
+  void DEC(uint8_t &M);
+  void EOR(uint8_t &M);
+  void INC(uint8_t &M);
+  void ISC(uint8_t &M);
+  void LAX(uint8_t &M);
+  void LDM(uint8_t &M);
+  void LSR(uint8_t &M);
+  void ORA(uint8_t &M);
+  void RLA(uint8_t &M);
+  void ROL(uint8_t &M);
+  void ROR(uint8_t &M);
+  void RRA(uint8_t &M);
+  void SBC(uint8_t &M);
+  void SLO(uint8_t &M);
+  void SRE(uint8_t &M);
+  void STM(uint8_t &M);
 
 private:
 
