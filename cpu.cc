@@ -127,6 +127,28 @@ void CPU::Tick()
 }
 
 // -----------------------------------------------------------------------------
+void CPU::Dump(std::ostream &os)
+{
+  os << std::hex;
+
+  os << "PC: " << std::setw(4) << PC << std::endl;
+  os << "SP: " << std::setw(4) << (int)S << std::endl;
+
+  os << " A: " << std::setw(4) << (int)A << std::endl;
+  os << " X: " << std::setw(4) << (int)X << std::endl;
+  os << " Y: " << std::setw(4) << (int)Y << std::endl;
+
+  os << "C:" << (int)C << "  ";
+  os << "Z:" << (int)Z << "  ";
+  os << "I:" << (int)I << "  ";
+  os << "D:" << (int)D << "  ";
+  os << "V:" << (int)V << "  ";
+  os << "N:" << (int)N << std::endl;
+
+  os << std::endl;
+}
+
+// -----------------------------------------------------------------------------
 inline void CPU::PushByte(uint8_t byte)
 {
   emu.mem.WriteByteStack(S--, byte);

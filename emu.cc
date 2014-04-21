@@ -9,9 +9,8 @@ void Emulator::Init(const std::string& file)
   mem.LoadINes(file);
   cpu.Start();
 
-  JIT jit;
-  JIT::Segment &seg = jit.CreateSegment(0x0000);
-  jit.Execute(seg);
+  JIT jit(*this);
+  jit.Execute();
 }
 
 // -----------------------------------------------------------------------------

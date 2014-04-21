@@ -231,12 +231,12 @@ private:
 
   /// Cartridge file
   std::unique_ptr<INes> cart;
-
   /// Memory mapper
   std::unique_ptr<Mapper> mapper;
-
   /// Reference to the emulator
   Emulator &emu;
+  /// JIT needs access
+  friend class JIT;
 };
 
 #endif /*__MEMORY_H__*/

@@ -31,6 +31,11 @@ public:
    */
   void Tick();
 
+  /**
+   * Prints the state of the CPU
+   */
+  void Dump(std::ostream &os);
+
 private:
   /**
    * List of addressing modes
@@ -96,6 +101,7 @@ private:
   template <AddrMode ReadMode, AddrMode WriteMode = ReadMode>
   inline void Instr(InstrFunc func);
 
+private:
   void AAX(uint8_t &M);
   void ADC(uint8_t &M);
   void AND(uint8_t &M);
@@ -125,7 +131,6 @@ private:
   void STM(uint8_t &M);
 
 private:
-
   #define I(r, c, i) void I##r##c##_##i();
   ROWL(0, BRK, ORA, KIL, SLO, DOP, ORA, ASL, SLO)
   ROWH(0, PHP, ORA, ASL, AAC, TOP, ORA, ASL, SLO)
@@ -192,6 +197,8 @@ private:
   Emulator &emu;
   /// Cycle counter
   uint64_t cycles;
+  /// JIT needs access to all these things
+  friend class JIT;
 };
 
 #endif /*__CPU_H__*/

@@ -23,6 +23,7 @@
 using namespace std;
 
 class Emulator;
+class JIT;
 
 #include "ines.h"
 #include "cpu.h"
@@ -103,6 +104,7 @@ private:
   friend class CPU;
   friend class PPU;
   friend class APU;
+  friend class JIT;
   friend class Memory;
 };
 
