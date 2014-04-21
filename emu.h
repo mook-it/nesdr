@@ -13,9 +13,11 @@
 #include <functional>
 #include <exception>
 #include <stdexcept>
+#include <map>
 #include <memory>
 #include <vector>
 #include <sstream>
+#include <sys/mman.h>
 #include <stdint.h>
 #include <getopt.h>
 using namespace std;
@@ -25,6 +27,7 @@ class Emulator;
 #include "ines.h"
 #include "cpu.h"
 #include "mem.h"
+#include "jit.h"
 #include "mmc.h"
 #include "apu.h"
 #include "ppu.h"

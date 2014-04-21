@@ -5,6 +5,7 @@ SET(SOURCES apu.cc
             cpu.cc
             emu.cc
             ines.cc
+            jit.cc
             mem.cc
             ppu.cc
             mmc.cc
@@ -14,6 +15,7 @@ SET(HEADERS apu.h
             cpu.h
             emu.h
             ines.h
+            jit.h
             mem.h
             ppu.h
             mmc.h

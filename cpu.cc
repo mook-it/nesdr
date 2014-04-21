@@ -149,10 +149,8 @@ inline uint8_t CPU::PopByte()
 inline uint16_t CPU::PopWord()
 {
   uint8_t wl, wh;
-
   wl = emu.mem.ReadByteStack(++S);
   wh = emu.mem.ReadByteStack(++S);
-
   return wl | (wh << 8);
 }
 
@@ -196,7 +194,6 @@ void CPU::ADC(uint8_t &M)
     : "g" (M)
     : "memory", "cc", "al"
     );
-  M = A;
 }
 
 // -----------------------------------------------------------------------------
@@ -503,7 +500,6 @@ void CPU::SBC(uint8_t &M)
     : "g" (M)
     : "memory", "cc", "al"
     );
-  M = A;
 }
 
 // -----------------------------------------------------------------------------
@@ -531,23 +527,6 @@ void CPU::I5D_EOR() { Instr<MEM_ABS_X, REG_A> (&CPU::EOR); }
 void CPU::I59_EOR() { Instr<MEM_ABS_Y, REG_A> (&CPU::EOR); }
 void CPU::I41_EOR() { Instr<MEM_IDX_X, REG_A> (&CPU::EOR); }
 void CPU::I51_EOR() { Instr<MEM_IND_Y, REG_A> (&CPU::EOR); }
-void CPU::I69_ADC() { Instr<IMM,       REG_A> (&CPU::ADC); }
-void CPU::I65_ADC() { Instr<MEM_ZP,    REG_A> (&CPU::ADC); }
-void CPU::I75_ADC() { Instr<MEM_ZP_X,  REG_A> (&CPU::ADC); }
-void CPU::I6D_ADC() { Instr<MEM_ABS,   REG_A> (&CPU::ADC); }
-void CPU::I7D_ADC() { Instr<MEM_ABS_X, REG_A> (&CPU::ADC); }
-void CPU::I79_ADC() { Instr<MEM_ABS_Y, REG_A> (&CPU::ADC); }
-void CPU::I61_ADC() { Instr<MEM_IDX_X, REG_A> (&CPU::ADC); }
-void CPU::I71_ADC() { Instr<MEM_IND_Y, REG_A> (&CPU::ADC); }
-void CPU::IE9_SBC() { Instr<IMM,       REG_A> (&CPU::SBC); }
-void CPU::IEB_SBC() { Instr<IMM,       REG_A> (&CPU::SBC); }
-void CPU::IE5_SBC() { Instr<MEM_ZP,    REG_A> (&CPU::SBC); }
-void CPU::IF5_SBC() { Instr<MEM_ZP_X,  REG_A> (&CPU::SBC); }
-void CPU::IED_SBC() { Instr<MEM_ABS,   REG_A> (&CPU::SBC); }
-void CPU::IFD_SBC() { Instr<MEM_ABS_X, REG_A> (&CPU::SBC); }
-void CPU::IF9_SBC() { Instr<MEM_ABS_Y, REG_A> (&CPU::SBC); }
-void CPU::IE1_SBC() { Instr<MEM_IDX_X, REG_A> (&CPU::SBC); }
-void CPU::IF1_SBC() { Instr<MEM_IND_Y, REG_A> (&CPU::SBC); }
 void CPU::IA1_LDA() { Instr<MEM_IDX_X, REG_A> (&CPU::LDM); }
 void CPU::IA5_LDA() { Instr<MEM_ZP,    REG_A> (&CPU::LDM); }
 void CPU::IA9_LDA() { Instr<IMM,       REG_A> (&CPU::LDM); }
@@ -687,6 +666,23 @@ void CPU::IE4_CPX() { Instr<MEM_ZP,    NOP> (&CPU::CPX); }
 void CPU::IEC_CPX() { Instr<MEM_ABS,   NOP> (&CPU::CPX); }
 void CPU::I24_BIT() { Instr<MEM_ZP,    NOP> (&CPU::BIT); }
 void CPU::I2C_BIT() { Instr<MEM_ABS,   NOP> (&CPU::BIT); }
+void CPU::I69_ADC() { Instr<IMM,       NOP> (&CPU::ADC); }
+void CPU::I65_ADC() { Instr<MEM_ZP,    NOP> (&CPU::ADC); }
+void CPU::I75_ADC() { Instr<MEM_ZP_X,  NOP> (&CPU::ADC); }
+void CPU::I6D_ADC() { Instr<MEM_ABS,   NOP> (&CPU::ADC); }
+void CPU::I7D_ADC() { Instr<MEM_ABS_X, NOP> (&CPU::ADC); }
+void CPU::I79_ADC() { Instr<MEM_ABS_Y, NOP> (&CPU::ADC); }
+void CPU::I61_ADC() { Instr<MEM_IDX_X, NOP> (&CPU::ADC); }
+void CPU::I71_ADC() { Instr<MEM_IND_Y, NOP> (&CPU::ADC); }
+void CPU::IE9_SBC() { Instr<IMM,       NOP> (&CPU::SBC); }
+void CPU::IEB_SBC() { Instr<IMM,       NOP> (&CPU::SBC); }
+void CPU::IE5_SBC() { Instr<MEM_ZP,    NOP> (&CPU::SBC); }
+void CPU::IF5_SBC() { Instr<MEM_ZP_X,  NOP> (&CPU::SBC); }
+void CPU::IED_SBC() { Instr<MEM_ABS,   NOP> (&CPU::SBC); }
+void CPU::IFD_SBC() { Instr<MEM_ABS_X, NOP> (&CPU::SBC); }
+void CPU::IF9_SBC() { Instr<MEM_ABS_Y, NOP> (&CPU::SBC); }
+void CPU::IE1_SBC() { Instr<MEM_IDX_X, NOP> (&CPU::SBC); }
+void CPU::IF1_SBC() { Instr<MEM_IND_Y, NOP> (&CPU::SBC); }
 
 // -----------------------------------------------------------------------------
 void CPU::I8A_TXA() { Instr<REG_X, REG_A> (&CPU::LDM); }
@@ -777,7 +773,8 @@ void CPU::I00_BRK()
 // -----------------------------------------------------------------------------
 void CPU::I20_JSR()
 {
-  PushWord(PC + 1); PC = emu.mem.ReadWord(PC);
+  PushWord(PC + 1);
+  PC = emu.mem.ReadWord(PC);
 }
 
 // -----------------------------------------------------------------------------
