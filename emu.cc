@@ -10,7 +10,9 @@ void Emulator::Init(const std::string& file)
   cpu.Start();
 
   JIT jit(*this);
+  cpu.Dump(std::cout);
   jit.Execute();
+  cpu.Dump(std::cout);
 }
 
 // -----------------------------------------------------------------------------

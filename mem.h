@@ -93,15 +93,7 @@ public:
   {
     uint8_t low = ReadByte(addr);
     uint8_t high = ReadByte(addr + 1);
-
-    __asm__
-      ( "movb %1, %%al\n\t"
-        "movb %2, %%ah\n\t"
-      : "=a" (addr)
-      : "r" (low), "r" (high)
-      );
-
-    return addr;
+    return low | (high << 8);
   }
 
   /**
