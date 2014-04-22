@@ -117,6 +117,7 @@ private:
   void EOR(uint8_t &M);
   void INC(uint8_t &M);
   void ISC(uint8_t &M);
+  void LAR(uint8_t &M);
   void LAX(uint8_t &M);
   void LDM(uint8_t &M);
   void LSR(uint8_t &M);
