@@ -207,6 +207,23 @@ inline void CPU::AAX(uint8_t &M)
 }
 
 // -----------------------------------------------------------------------------
+inline void CPU::AXA(uint8_t &M)
+{
+  M = A & X & 0x7;
+}
+
+// -----------------------------------------------------------------------------
+inline void CPU::Bcc(uint8_t M)
+{
+  PC += M ? (int8_t)emu.mem.ReadByte(PC++) : 1;
+}
+
+// -----------------------------------------------------------------------------
+inline void CPU::STM(uint8_t &M)
+{
+}
+
+// -----------------------------------------------------------------------------
 inline void CPU::ADC(uint8_t &M)
 {
   __asm__
@@ -229,18 +246,6 @@ inline void CPU::ADC(uint8_t &M)
 }
 
 // -----------------------------------------------------------------------------
-inline void CPU::AXA(uint8_t &M)
-{
-  M = A & X & 0x7;
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::Bcc(uint8_t M)
-{
-  PC += M ? (int8_t)emu.mem.ReadByte(PC++) : 1;
-}
-
-// -----------------------------------------------------------------------------
 inline void CPU::LDM(uint8_t &M)
 {
   __asm__
@@ -252,11 +257,6 @@ inline void CPU::LDM(uint8_t &M)
     : [M]  "r" (M)
     : "memory", "cc"
     );
-}
-
-// -----------------------------------------------------------------------------
-inline void CPU::STM(uint8_t &M)
-{
 }
 
 // -----------------------------------------------------------------------------
@@ -377,14 +377,17 @@ inline void CPU::ROL(uint8_t &M)
 inline void CPU::ROR(uint8_t &M)
 {
   __asm__
-    ( "movb    %1, %%dl       \n\t"
+    ( "movb    %[C], %%dl     \n\t"
       "addb    $0xFF, %%dl    \n\t"
-      "rcrb    $1, %0         \n\t"
-      "setcb   %1             \n\t"
-      "testb   $0xFF, %0      \n\t"
-      "setzb   %2             \n\t"
-      "setsb   %3             \n\t"
-    : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+      "rcrb    $1, %[M]       \n\t"
+      "setcb   %[C]           \n\t"
+      "testb   $0xFF, %[M]    \n\t"
+      "setzb   %[Z]           \n\t"
+      "setsb   %[N]           \n\t"
+    : [M] "+g" (M)
+    , [C] "=m" (C)
+    , [Z] "=m" (Z)
+    , [N] "=m" (N)
     :
     : "memory", "cc", "dl"
     );
@@ -393,11 +396,19 @@ inline void CPU::ROR(uint8_t &M)
 // -----------------------------------------------------------------------------
 inline void CPU::DCP(uint8_t &M)
 {
-  M = M - 1;
-
-  Z = M == A;
-  C = A >= M;
-  N = ((A - M) & 0x80) ? 1 : 0;
+  __asm__
+    ( "decb    %[M]           \n\t"
+      "cmpb    %[M], %[A]     \n\t"
+      "setnbb  %[C]           \n\t"
+      "setzb   %[Z]           \n\t"
+      "setsb   %[N]           \n\t"
+    : [M] "+q" (M)
+    , [Z] "=m" (Z)
+    , [C] "=m" (C)
+    , [N] "=m" (N)
+    : [A]  "m" (A)
+    : "memory", "cc"
+    );
 }
 
 // -----------------------------------------------------------------------------
@@ -479,10 +490,12 @@ inline void CPU::RRA(uint8_t &M)
 inline void CPU::INC(uint8_t &M)
 {
   __asm__
-    ( "incb    %0             \n\t"
-      "setsb   %1             \n\t"
-      "setzb   %2             \n\t"
-    :  "+q" (M), "=m" (N), "=m" (Z)
+    ( "incb    %[M]           \n\t"
+      "setsb   %[N]           \n\t"
+      "setzb   %[Z]           \n\t"
+    : [M] "+q" (M)
+    , [N] "=m" (N)
+    , [Z] "=m" (Z)
     :
     : "memory", "cc"
     );
@@ -492,10 +505,12 @@ inline void CPU::INC(uint8_t &M)
 inline void CPU::DEC(uint8_t &M)
 {
   __asm__
-    ( "decb    %0             \n\t"
-      "setsb   %1             \n\t"
-      "setzb   %2             \n\t"
-    :  "+q" (M), "=m" (N), "=m" (Z)
+    ( "decb    %[M]           \n\t"
+      "setsb   %[N]           \n\t"
+      "setzb   %[Z]           \n\t"
+    : [M] "+q" (M)
+    , [N] "=m" (N)
+    , [Z] "=m" (Z)
     :
     : "memory", "cc"
     );
@@ -505,12 +520,15 @@ inline void CPU::DEC(uint8_t &M)
 inline void CPU::CMP(uint8_t &M)
 {
   __asm__
-    ( "cmpb    %3, %4         \n\t"
-      "setnbb  %0             \n\t"
-      "setsb   %1             \n\t"
-      "seteb   %2             \n\t"
-    : "=m" (C), "=m" (N), "=m" (Z)
-    : "Q" (M), "m" (A)
+    ( "cmpb    %[M], %[A]     \n\t"
+      "setnbb  %[C]           \n\t"
+      "setsb   %[N]           \n\t"
+      "seteb   %[Z]           \n\t"
+    : [C] "=m" (C)
+    , [N] "=m" (N)
+    , [Z] "=m" (Z)
+    : [M]  "q" (M)
+    , [A]  "m" (A)
     : "memory", "cc"
     );
 }
@@ -519,12 +537,15 @@ inline void CPU::CMP(uint8_t &M)
 inline void CPU::CPX(uint8_t &M)
 {
   __asm__
-    ( "cmpb    %3, %4         \n\t"
-      "setnbb  %0             \n\t"
-      "setsb   %1             \n\t"
-      "seteb   %2             \n\t"
-    : "=m" (C), "=m" (N), "=m" (Z)
-    : "Q" (M), "m" (X)
+    ( "cmpb    %[M], %[X]     \n\t"
+      "setnbb  %[C]           \n\t"
+      "setsb   %[N]           \n\t"
+      "seteb   %[Z]           \n\t"
+    : [C] "=m" (C)
+    , [N] "=m" (N)
+    , [Z] "=m" (Z)
+    : [M]  "q" (M)
+    , [X]  "m" (X)
     : "memory", "cc"
     );
 }
@@ -540,7 +561,7 @@ inline void CPU::CPY(uint8_t &M)
     : [C] "=m" (C)
     , [N] "=m" (N)
     , [Z] "=m" (Z)
-    : [M]  "Q" (M)
+    : [M]  "q" (M)
     , [Y]  "m" (Y)
     : "memory", "cc"
     );
@@ -584,9 +605,21 @@ void CPU::SBC(uint8_t &M)
 // -----------------------------------------------------------------------------
 inline void CPU::LAR(uint8_t &M)
 {
-  A = X = S = S & M;
-  Z = A == 0;
-  N = A & 0x80 ? 1 : 0;
+  __asm__
+    ( "andb    %[S], %[M]     \n\t"
+      "setsb   %[N]           \n\t"
+      "setzb   %[Z]           \n\t"
+      "movb    %[M], %[A]     \n\t"
+      "movb    %[M], %[X]     \n\t"
+      "movb    %[M], %[S]     \n\t"
+    : [A] "=m" (A)
+    , [X] "=m" (X)
+    , [S] "+m" (S)
+    , [Z] "=m" (Z)
+    , [N] "=m" (N)
+    : [M]  "q" (M)
+    : "memory", "cc"
+    );
 }
 
 // -----------------------------------------------------------------------------
