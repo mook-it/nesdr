@@ -357,14 +357,17 @@ inline void CPU::LSR(uint8_t &M)
 inline void CPU::ROL(uint8_t &M)
 {
   __asm__
-    ( "movb    %1, %%dl       \n\t"
+    ( "movb    %[C], %%dl     \n\t"
       "addb    $0xFF, %%dl    \n\t"
-      "rclb    $1, %0         \n\t"
-      "setcb   %1             \n\t"
-      "testb   $0xFF, %0      \n\t"
-      "setzb   %2             \n\t"
-      "setsb   %3             \n\t"
-    : "+g" (M), "=m" (C), "=m" (Z), "=m" (N)
+      "rclb    $1, %[M]       \n\t"
+      "setcb   %[C]           \n\t"
+      "testb   $0xFF, %[M]    \n\t"
+      "setzb   %[Z]           \n\t"
+      "setsb   %[N]           \n\t"
+    : [M] "+g" (M)
+    , [C] "=m" (C)
+    , [Z] "=m" (Z)
+    , [N] "=m" (N)
     :
     : "memory", "cc", "dl"
     );
@@ -546,8 +549,7 @@ inline void CPU::CPY(uint8_t &M)
 // -----------------------------------------------------------------------------
 inline void CPU::LAX(uint8_t &M)
 {
-  __asm__-------------------
-void CPU::IBB_LAR() { Instr<MEM_ABS_Y, NOP> (&CPU::LAR); }
+  __asm__
     ( "testb   %[M], %[M]     \n\t"
       "setzb   %[Z]           \n\t"
       "setsb   %[N]           \n\t"
